@@ -14,7 +14,6 @@ def resource_path(relative_path):
 
 # === Логирование ===
 from core_parser.logger import setup_logging
-import logging
 import re
 
 # Включаем расширенное логирование
