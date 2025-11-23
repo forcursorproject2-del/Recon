@@ -4,15 +4,46 @@ import logging
 from typing import Dict, Any
 import os
 from pathlib import Path
+import glob
 from .ocr_cache import OcrCache
 import re
 from .paddle_ocr import PaddleOCRExtractor
 
 logger = logging.getLogger(__name__)
 
+class PDFBatchProcessor:
+    def __init__(self, use_ocr: bool = False):
+        self.use_ocr = use_ocr
+        self.extractor = PDFTextExtractor(use_ocr=use_ocr)
+
+    def process_folder(self, folder_path: str) -> Dict[str, Dict[str, Any]]:
+        """
+        Processes all PDF files in a folder.
+        Returns a dictionary mapping filenames to their extracted data.
+        """
+        logger.debug(f"Starting batch processing of folder: {folder_path}")
+        pdf_files = glob.glob(os.path.join(folder_path, "*.pdf"))
+        logger.info(f"Found {len(pdf_files)} PDF files to process")
+        
+        results = {}
+        for pdf_path in pdf_files:
+            filename = os.path.basename(pdf_path)
+            try:
+                logger.debug(f"Processing file: {filename}")
+                extracted_data = self.extractor.extract_text_with_structure(pdf_path)
+                results[filename] = extracted_data
+                logger.debug(f"Successfully processed: {filename}")
+            except Exception as e:
+                logger.error(f"Error processing {filename}: {e}")
+                results[filename] = {'error': str(e)}
+        
+        logger.info(f"Batch processing completed. Processed {len(results)} files.")
+        return results
+
 class PDFTextExtractor:
-    def __init__(self, config_manager=None):
+    def __init__(self, config_manager=None, use_ocr=False):
         self.config_manager = config_manager
+        self.use_ocr = use_ocr
 
         self.ocr_cache = OcrCache()
         self.ocr_extractor = PaddleOCRExtractor(cache_db="ocr_cache.db")

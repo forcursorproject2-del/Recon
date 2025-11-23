@@ -80,48 +80,65 @@ if __name__ == "__main__":
         logger.debug(f"Папка {folder} проверена/создана")
 
     def run_reconciliation_act_test():
-        config_manager = ConfigManager()
-        config = config_manager.config
-        extractor = pipeline.pdf_processor.extractor
-        pdf_path = Path('incoming') / 'CCF_003705.pdf'
-        extraction_result = extractor.extract_text_with_structure(str(pdf_path))
-        full_text = extraction_result.get('full_text', '')
-        logger.info(f"Полный извлечённый текст ({len(full_text)} символов):\n{full_text}")
+        try:
+            config_manager = ConfigManager()
+            extractor = pipeline.pdf_processor.extractor
+            
+            # Find a PDF file in the incoming folder
+            incoming_path = Path("incoming")
+            pdf_files = list(incoming_path.glob("*.pdf"))
+            
+            if not pdf_files:
+                logger.warning("No PDF files found in incoming folder for testing")
+                return
+                
+            pdf_path = pdf_files[0]  # Use the first PDF file found
+            logger.info(f"Processing test file: {pdf_path}")
+            
+            extraction_result = extractor.extract_text_with_structure(str(pdf_path))
+            full_text = extraction_result.get('full_text', '')
+            logger.info(f"Полный извлечённый текст ({len(full_text)} символов):\n{full_text[:500]}...")  # Show first 500 chars
 
-        ocr_used = pipeline.pdf_processor.use_ocr and not any(page['text'].strip() for page in extraction_result.get('pages', []))
-        logger.info(f"OCR включен: {pipeline.pdf_processor.use_ocr}")
-        logger.info(f"OCR фактически использован (нет текста из pdfplumber): {ocr_used}")
-        logger.info(f"Количество символов извлечено: {len(full_text)}")
+            ocr_used = pipeline.pdf_processor.use_ocr
+            logger.info(f"OCR включен: {pipeline.pdf_processor.use_ocr}")
+            logger.info(f"Количество символов извлечено: {len(full_text)}")
 
-        classifier = DocumentClassifier(config_manager)
-        classification_result = classifier.classify_document(full_text, extraction_result)
+            classifier = DocumentClassifier(config_manager)
+            classification_result = classifier.classify_document(full_text, extraction_result)
 
-        normalized_text = full_text.replace('ё', 'е').replace('Ё', 'Е')
-        normalized_text = re.sub(r'\s+', ' ', normalized_text)
-        scores = {}
-        for doc_type, sig in classifier.config.items():
-            score = 0
-            for kw in sig.get('keywords', []):
-                if kw.lower() in normalized_text.lower():
-                    score += 1
-            for pat in sig.get('patterns', []):
-                if re.search(pat, normalized_text, re.IGNORECASE):
-                    score += 2
-            for ex in sig.get('exclude', []):
-                if ex.lower() in normalized_text.lower():
-                    score -= 1
-            scores[doc_type] = max(0, score)
-        logger.info(f"Rule-based классификация scores по типам документов: {scores}")
+            normalized_text = full_text.replace('ё', 'е').replace('Ё', 'Е')
+            normalized_text = re.sub(r'\s+', ' ', normalized_text)
+            scores = {}
+            for doc_type, sig in classifier.config.items():
+                score = 0
+                for kw in sig.get('keywords', []):
+                    if kw.lower() in normalized_text.lower():
+                        score += 1
+                for pat in sig.get('patterns', []):
+                    # Handle raw string patterns
+                    pattern_str = pat
+                    if isinstance(pat, str) and pat.startswith("r'") and pat.endswith("'"):
+                        pattern_str = pat[2:-1]
+                    if re.search(pattern_str, normalized_text, re.IGNORECASE):
+                        score += 2
+                for ex in sig.get('exclude', []):
+                    if ex.lower() in normalized_text.lower():
+                        score -= 1
+                scores[doc_type] = max(0, score)
+            logger.info(f"Rule-based классификация scores по типам документов: {scores}")
 
-        logger.info(f"Финальный doc_type: {classification_result.doc_type}, confidence: {classification_result.confidence}")
+            logger.info(f"Финальный doc_type: {classification_result.doc_type}, confidence: {classification_result.confidence}")
 
-        if classification_result.confidence < 0.5:
-            snippet_start = full_text[:1000]
-            snippet_end = full_text[-500:]
-            logger.warning(f"Низкий уровень доверия (<0.5). Первые 1000 символов:\n{snippet_start}")
-            logger.warning(f"Последние 500 символов:\n{snippet_end}")
+            if classification_result.confidence < 0.5:
+                snippet_start = full_text[:1000]
+                snippet_end = full_text[-500:]
+                logger.warning(f"Низкий уровень доверия (<0.5). Первые 1000 символов:\n{snippet_start}")
+                logger.warning(f"Последние 500 символов:\n{snippet_end}")
 
-        check_text_issues(full_text)
+            check_text_issues(full_text)
+            
+        except Exception as e:
+            logger.error(f"Error during test run: {e}", exc_info=True)
 
     run_reconciliation_act_test()
 

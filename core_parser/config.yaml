@@ -1,8 +1,8 @@
 classifier:
-  mode: "rules_only"          # максимальная стабильность из коробки
+  mode: "ensemble"          # используем все методы для лучшего качества
   use_rules: true
-  use_ml: false               # выключено по умолчанию
-  use_bert: false             # выключено по умолчанию
+  use_ml: true               # включаем ML для улучшения классификации
+  use_bert: false             # выключаем BERT для экономии памяти при тестировании
 
 pdf_extractor:
   ocr_enabled: true

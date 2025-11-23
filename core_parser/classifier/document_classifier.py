@@ -183,20 +183,63 @@ class DocumentClassifier:
                 logger.warning("После обрезки текст оказался пустым для BERT-классификации")
                 return ClassificationResult('unknown', 0.0, 0.0, 0.0, 0.0, "")
             
-            embedding = self.bert_clf.encode(processed_text)
-            # Для улучшения качества классификации, можно использовать косинусное сходство
-            # с эталонными эмбеддингами для каждого типа документа
-            # Пока что используем улучшенную заглушку, но с более разумной логикой
-            embedding_norm = float(abs(embedding).mean())  # усреднённое значение эмбеддинга
-            confidence = min(1.0, max(0.0, embedding_norm / 2.0))  # нормализуем в диапазон [0, 1]
+            # Нормализуем текст перед BERT-обработкой
+            processed_text = self._normalize_text(processed_text)
             
-            # Пока что возвращаем 'unknown', но в будущем можно реализовать
-            # сравнение с эталонными эмбеддингами для определения типа документа
-            doc_type = 'unknown'
-            return ClassificationResult(doc_type, confidence, 0.0, 0.0, confidence, "")
+            # Получаем эмбеддинг текста документа
+            doc_embedding = self.bert_clf.encode(processed_text)
+            
+            # Создаем эталонные эмбеддинги для каждого типа документа на основе ключевых слов
+            best_similarity = 0.0
+            best_doc_type = 'unknown'
+            
+            for doc_type in self.doc_types:
+                signature = self.config.get(doc_type, {})
+                keywords = signature.get('keywords', [])
+                patterns = signature.get('patterns', [])
+                
+                # Создаем эталонный текст для типа документа на основе ключевых слов
+                reference_text = ' '.join(keywords + patterns)
+                if reference_text:
+                    ref_embedding = self.bert_clf.encode(self._normalize_text(reference_text))
+                    
+                    # Вычисляем косинусное сходство
+                    similarity = self._cosine_similarity(doc_embedding, ref_embedding)
+                    
+                    if similarity > best_similarity:
+                        best_similarity = similarity
+                        best_doc_type = doc_type
+            
+            # Нормализуем схожесть в диапазон [0, 1]
+            confidence = min(1.0, max(0.0, best_similarity))
+            
+            return ClassificationResult(best_doc_type, confidence, 0.0, 0.0, confidence, "")
         except Exception as e:
             logger.warning(f"BERT classification failed: {e}")
             return ClassificationResult('unknown', 0.0, 0.0, 0.0, 0.0, "")
+    
+    def _cosine_similarity(self, vec1, vec2) -> float:
+        """Вычисляет косинусное сходство между двумя векторами"""
+        import numpy as np
+        
+        # Преобразуем в numpy массивы, если они еще не таковы
+        if not isinstance(vec1, np.ndarray):
+            vec1 = np.array(vec1)
+        if not isinstance(vec2, np.ndarray):
+            vec2 = np.array(vec2)
+            
+        # Нормализуем векторы
+        norm1 = np.linalg.norm(vec1)
+        norm2 = np.linalg.norm(vec2)
+        
+        if norm1 == 0 or norm2 == 0:
+            return 0.0
+            
+        # Вычисляем косинусное сходство
+        cosine_sim = np.dot(vec1, vec2) / (norm1 * norm2)
+        
+        # Возвращаем значение в диапазоне [0, 1]
+        return (cosine_sim + 1) / 2  # Приводим к диапазону [0, 1] из [-1, 1]
 
     def train_on_labeled_data(self, labeled_texts: List[Tuple[str, str]]):
         texts, labels = zip(*labeled_texts)
