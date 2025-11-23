@@ -53,6 +53,29 @@ class DocumentClassifier:
         self.doc_types = list(self.config.keys())
         logger.info(f"Classifier initialized in mode: {self.mode}")
 
+    def _normalize_text(self, text: str) -> str:
+        """Нормализация текста для русского языка: приведение к нижнему регистру, 
+        замена 'ё' на 'е', нормализация пробелов, удаление лишних символов."""
+        if not text:
+            return ""
+        
+        # Приведение к нижнему регистру
+        text = text.lower()
+        
+        # Замена 'ё' на 'е'
+        text = text.replace('ё', 'е')
+        
+        # Нормализация пробелов (заменяем последовательности пробельных символов на один пробел)
+        text = re.sub(r'\s+', ' ', text)
+        
+        # Удаление лишних символов, оставляем только буквы, цифры, пробелы и базовые знаки препинания
+        text = re.sub(r'[^\w\s\.\,\-\+\(\)\[\]\{\}\/\\=:;]', ' ', text)
+        
+        # Удаление лишних пробелов в начале и конце
+        text = text.strip()
+        
+        return text
+
     def _init_ml_pipeline(self) -> Pipeline:
         return Pipeline([
             ('tfidf', TfidfVectorizer(max_features=1000, ngram_range=(1,2))),
@@ -93,7 +116,7 @@ class DocumentClassifier:
             return ClassificationResult(final_doc_type, final_confidence, rule_result.confidence, ml_result.confidence, bert_result.confidence, "ensemble_mode")
 
     def _rule_based_classification(self, text: str) -> ClassificationResult:
-        import re
+        
         # Нормализация текста
         text = text.lower()
         text = text.replace('ё', 'е')
@@ -131,19 +154,45 @@ class DocumentClassifier:
     def _ml_classification(self, text: str) -> ClassificationResult:
         if not self.ml_pipeline or not hasattr(self.ml_pipeline.named_steps['clf'], 'classes_'):
             return ClassificationResult('unknown', 0.0, 0.0, 0.0, 0.0, "")
-        proba = self.ml_pipeline.predict_proba([text])[0]
-        best_idx = proba.argmax()
-        return ClassificationResult(self.ml_pipeline.named_steps['clf'].classes_[best_idx], proba[best_idx], 0.0, proba[best_idx], 0.0, "")
+        try:
+            if not text or not text.strip():
+                logger.warning("Пустой текст для ML-классификации")
+                return ClassificationResult('unknown', 0.0, 0.0, 0.0, 0.0, "")
+            
+            proba = self.ml_pipeline.predict_proba([text])[0]
+            best_idx = proba.argmax()
+            best_class = self.ml_pipeline.named_steps['clf'].classes_[best_idx]
+            confidence = proba[best_idx]
+            return ClassificationResult(best_class, confidence, 0.0, confidence, 0.0, "")
+        except Exception as e:
+            logger.warning(f"ML classification failed: {e}")
+            return ClassificationResult('unknown', 0.0, 0.0, 0.0, 0.0, "")
 
     def _bert_classification(self, text: str) -> ClassificationResult:
         if not self.bert_clf:
             return ClassificationResult('unknown', 0.0, 0.0, 0.0, 0.0, "")
         try:
-            embedding = self.bert_clf.encode(text[:512])
-            # For simplicity, use cosine similarity to predefined embeddings (not implemented here)
-            # Placeholder: assume confidence based on embedding norm
-            confidence = min(1.0, embedding.sum() / 1000)  # Dummy calculation
-            doc_type = 'unknown'  # Need to map embedding to doc_type
+            # Убедимся, что текст не пустой
+            if not text or not text.strip():
+                logger.warning("Пустой текст для BERT-классификации")
+                return ClassificationResult('unknown', 0.0, 0.0, 0.0, 0.0, "")
+            
+            # Ограничиваем длину текста для BERT (максимум 512 токенов)
+            processed_text = text[:512].strip()
+            if not processed_text:
+                logger.warning("После обрезки текст оказался пустым для BERT-классификации")
+                return ClassificationResult('unknown', 0.0, 0.0, 0.0, 0.0, "")
+            
+            embedding = self.bert_clf.encode(processed_text)
+            # Для улучшения качества классификации, можно использовать косинусное сходство
+            # с эталонными эмбеддингами для каждого типа документа
+            # Пока что используем улучшенную заглушку, но с более разумной логикой
+            embedding_norm = float(abs(embedding).mean())  # усреднённое значение эмбеддинга
+            confidence = min(1.0, max(0.0, embedding_norm / 2.0))  # нормализуем в диапазон [0, 1]
+            
+            # Пока что возвращаем 'unknown', но в будущем можно реализовать
+            # сравнение с эталонными эмбеддингами для определения типа документа
+            doc_type = 'unknown'
             return ClassificationResult(doc_type, confidence, 0.0, 0.0, confidence, "")
         except Exception as e:
             logger.warning(f"BERT classification failed: {e}")
