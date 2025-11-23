@@ -53,24 +53,33 @@ class PaddleOCRExtractor:
 
     def extract_text(self, image: np.ndarray) -> str:
         # image — np.array в BGR от PyMuPDF
-        _, buffer = cv2.imencode('.png', image)
-        page_bytes = buffer.tobytes()
-        page_hash = self._page_hash(page_bytes)
+        try:
+            _, buffer = cv2.imencode('.png', image)
+            page_bytes = buffer.tobytes()
+            page_hash = self._page_hash(page_bytes)
 
-        cached = self._get_from_cache(page_hash)
-        if cached is not None:
-            return cached
+            cached = self._get_from_cache(page_hash)
+            if cached is not None:
+                return cached
 
-        result = self.ocr.ocr(image, det=True, rec=True, cls=True, merge_text=True)
-        lines = []
-        for line_info in result[0]:
-            text = line_info[1][0]
-            conf = line_info[1][1]
-            if conf >= 0.55:
-                # Исправляем типичные ошибки PaddleOCR
-                text = text.replace('ё', 'ё').replace('Ё', 'Ё')  # уже нормально, но на всякий
-                lines.append(text)
+            result = self.ocr.ocr(image, det=True, rec=True, cls=True, merge_text=True)
+            
+            if not result or len(result) == 0 or result[0] is None:
+                return ""
+                
+            lines = []
+            for line_info in result[0]:
+                if line_info is not None and len(line_info) > 1:
+                    text = line_info[1][0] if line_info[1] is not None else ""
+                    conf = line_info[1][1] if line_info[1] is not None and len(line_info[1]) > 1 else 0.0
+                    if conf >= 0.55 and text:
+                        # Исправляем типичные ошибки PaddleOCR
+                        text = text.replace('ё', 'ё').replace('Ё', 'Ё')  # уже нормально, но на всякий
+                        lines.append(text)
 
-        full_text = "\n".join(lines)
-        self._save_to_cache(page_hash, full_text)
-        return full_text
+            full_text = "\n".join(lines)
+            self._save_to_cache(page_hash, full_text)
+            return full_text
+        except Exception as e:
+            print(f"OCR extraction failed: {e}")
+            return ""

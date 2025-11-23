@@ -53,17 +53,58 @@ class FieldExtractor:
     def _extract_single_field(self, text: str, pat: Dict[str, Any]) -> ExtractedField:
         pattern = pat['pattern']
         validate = pat['validate']
-        matches = list(re.finditer(pattern, text, re.IGNORECASE))
+        
+        # Compile the pattern if it's a raw string
+        if isinstance(pattern, str) and pattern.startswith('r\'') and pattern.endswith('\''):
+            pattern = pattern[2:-1]  # Remove r' and '
+        
+        matches = list(re.finditer(pattern, text, re.IGNORECASE | re.MULTILINE))
         if not matches:
             return ExtractedField(None, 0.0, "")
-        # Take first match
-        match = matches[0]
-        raw_value = match.group(1).strip()
-        # Trim spaces inside raw_value to fix extraction for fields like INN
-        raw_value = raw_value.replace(" ", "").replace("\u00A0", "")
-        value = self._normalize_value(raw_value, validate)
-        confidence = 1.0 if value is not None else 0.0
-        return ExtractedField(value, confidence, match.group(0))
+        
+        # Take the best match based on confidence
+        best_match = None
+        best_value = None
+        best_confidence = 0.0
+        
+        for match in matches:
+            raw_value = match.group(1).strip()
+            # Clean the raw value
+            raw_value = raw_value.replace(" ", "").replace("\u00A0", "").replace("\t", "").replace("\n", "")
+            value = self._normalize_value(raw_value, validate)
+            
+            if value is not None:
+                confidence = self._calculate_extraction_confidence(match.group(0), validate)
+                if confidence > best_confidence:
+                    best_confidence = confidence
+                    best_value = value
+                    best_match = match.group(0)
+        
+        if best_value is not None:
+            return ExtractedField(best_value, best_confidence, best_match)
+        else:
+            return ExtractedField(None, 0.0, "")
+    
+    def _calculate_extraction_confidence(self, matched_text: str, validate_type: str) -> float:
+        """Calculate confidence based on the quality of the match"""
+        if validate_type == 'digits_10_12':
+            # For INN, longer match is better
+            return min(1.0, len(matched_text) / 20)
+        elif validate_type == 'digits_9':
+            # For KPP, exact match is important
+            digits = re.sub(r'[\\D]', '', matched_text)
+            if len(digits) == 9:
+                return 1.0
+            else:
+                return 0.5
+        elif validate_type == 'float':
+            # For amounts, more digits after decimal suggest precision
+            return min(1.0, len(matched_text) / 20)
+        elif validate_type == 'date':
+            # For dates, standard formats get higher confidence
+            return 0.9
+        else:
+            return 0.7
 
     def _normalize_value(self, raw: str, validate: str) -> Any:
         try:
@@ -74,12 +115,51 @@ class FieldExtractor:
                 if re.match(r'^\d{9}$', raw):
                     return raw
             elif validate == 'float':
-                cleaned = re.sub(r'[^\d.,]', '', raw).replace(',', '.')
-                return float(cleaned)
+                # Handle various number formats (with commas as decimal separators, etc.)
+                cleaned = raw.replace(',', '.').replace(' ', '').replace('\u00A0', '')
+                cleaned = re.sub(r'[^\d.-]', '', cleaned)
+                if cleaned:
+                    return float(cleaned)
             elif validate == 'date':
-                dt = datetime.strptime(raw, '%d.%m.%Y')
-                return dt.strftime('%Y-%m-%d')
-        except:
+                # Handle multiple date formats
+                date_patterns = [
+                    (r'(\d{2})\.(\d{2})\.(\d{4})', '%d.%m.%Y'),  # DD.MM.YYYY
+                    (r'(\d{2})\s+(\d{2})\s+(\d{4})', '%d %m %Y'),  # DD MM YYYY
+                    (r'(\d{4})-(\d{2})-(\d{2})', '%Y-%m-%d'),  # YYYY-MM-DD
+                    (r'(\d{2})-(\d{2})-(\d{4})', '%d-%m-%Y'),  # DD-MM-YYYY
+                ]
+                
+                for pattern, fmt in date_patterns:
+                    match = re.search(pattern, raw)
+                    if match:
+                        try:
+                            dt = datetime.strptime(match.group(0), fmt)
+                            return dt.strftime('%Y-%m-%d')
+                        except ValueError:
+                            continue
+                
+                # Try to parse Russian date format with month names
+                try:
+                    # Replace Russian month names with English equivalents for parsing
+                    month_names = {
+                        'января': 'January', 'февраля': 'February', 'марта': 'March',
+                        'апреля': 'April', 'мая': 'May', 'июня': 'June',
+                        'июля': 'July', 'августа': 'August', 'сентября': 'September',
+                        'октября': 'October', 'ноября': 'November', 'декабря': 'December'
+                    }
+                    
+                    date_str = raw.lower()
+                    for ru_month, en_month in month_names.items():
+                        date_str = date_str.replace(ru_month, en_month)
+                    
+                    # Try parsing date with month name
+                    dt = datetime.strptime(date_str, '%d %B %Y')
+                    return dt.strftime('%Y-%m-%d')
+                except ValueError:
+                    pass
+                    
+        except Exception as e:
+            logger.debug(f"Value normalization error for '{raw}' with validation '{validate}': {e}")
             pass
         return None
 
