@@ -1,0 +1,685 @@
+<!DOCTYPE html>
+<html lang="ru" class="h-full">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Core Parser</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            cyan: '#00d4ff',
+            purple: '#9d4edd',
+            'dark-bg': '#0f0f1a',
+            'dark-card': '#1a1a2e'
+          },
+          fontFamily: {
+            sans: ['Segoe UI Variable', 'system-ui', 'sans-serif']
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    :root { --cyan: #00d4ff; --purple: #9d4edd; }
+    body { margin: 0; padding: 0; height: 100vh; font-family: 'Segoe UI Variable', system-ui, sans-serif; background: linear-gradient(135deg, #0f0f1a 0%, #1a1a2e 100%); }
+    .glass { background: rgba(255,255,255,0.05); backdrop-filter: blur(16px); border: 1px solid rgba(255,255,255,0.1); border-radius: 16px; }
+    .btn-gradient { background: linear-gradient(135deg, #00d4ff 0%, #9d4edd 100%); color: white; font-weight: 500; padding: 12px 24px; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,212,255,0.25); transition: all 0.3s ease; transform: scale(1); }
+    .btn-gradient:hover { box-shadow: 0 8px 30px rgba(0,212,255,0.4); transform: scale(1.05); }
+    .draggable { background: linear-gradient(135deg, #00d4ff 0%, #9d4edd 100%); color: white; padding: 8px 16px; border-radius: 8px; cursor: grab; box-shadow: 0 2px 10px rgba(0,212,255,0.2); transition: all 0.3s ease; }
+    .draggable:active { cursor: grabbing; transform: scale(0.95); }
+    .cell { border: 1px solid rgba(255,255,255,0.2); padding: 4px; font-size: 12px; text-align: center; min-width: 40px; background: rgba(255,255,255,0.02); border-radius: 4px; }
+    .tab-active { background: linear-gradient(135deg, #00d4ff 0%, #9d4edd 100%); color: white; }
+    .fade-in { animation: fadeIn 0.5s ease-in; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+    .sidebar-item { transition: all 0.3s ease; border-radius: 8px; }
+    .sidebar-item:hover { background: rgba(255,255,255,0.1); transform: translateX(4px); }
+    @keyframes slideInFromRight { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+    @keyframes scaleIn { from { transform: scale(0.9); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+    .toast-enter { animation: slideInFromRight 0.3s ease-out; }
+    .modal-enter { animation: scaleIn 0.3s ease-out; }
+  </style>
+</head>
+<body class="h-full text-gray-100 overflow-hidden">
+
+  <div class="flex h-full">
+    <!-- Левая панель (VSCode-style) -->
+    <aside class="w-72 glass p-6 space-y-8">
+      <div class="flex items-center gap-3">
+        <i data-lucide="zap" class="w-9 h-9 text-cyan-400"></i>
+        <h1 class="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-cyan-400 to-purple-400">
+          Core Parser
+        </h1>
+      </div>
+
+      <nav class="space-y-2">
+        <button onclick="showTab('upload')" id="tab-upload" class="w-full text-left p-3 rounded-xl bg-white/10 hover:bg-white/20 transition-all flex items-center gap-3">
+          <i data-lucide="upload" class="w-5 h-5"></i> Загрузка
+        </button>
+        <button onclick="showTab('results')" id="tab-results" class="w-full text-left p-3 rounded-xl bg-white/10 hover:bg-white/20 transition-all flex items-center gap-3">
+          <i data-lucide="table" class="w-5 h-5"></i> Результаты
+        </button>
+      </nav>
+
+      <div class="space-y-3 text-sm">
+        <div class="flex justify-between p-3 rounded-lg bg-white/5">
+          <span class="flex items-center gap-2"><i data-lucide="folder-open" class="w-4 h-4"></i> incoming/</span>
+          <span class="text-cyan-400 font-mono" id="count-incoming">0</span>
+        </div>
+        <div class="flex justify-between p-3 rounded-lg bg-white/5">
+          <span class="flex items-center gap-2"><i data-lucide="check-circle" class="w-4 h-4"></i> processed/</span>
+          <span class="text-green-400 font-mono" id="count-processed">0</span>
+        </div>
+        <div class="flex justify-between p-3 rounded-lg bg-white/5">
+          <span class="flex items-center gap-2"><i data-lucide="file-text" class="w-4 h-4"></i> results/</span>
+          <span class="text-purple-400 font-mono" id="count-results">0</span>
+        </div>
+      </div>
+
+      <div class="space-y-3">
+        <button onclick="runParsing()" class="w-full btn-gradient flex items-center justify-center gap-2">
+          <i data-lucide="play" class="w-5 h-5"></i> Запустить обработку
+        </button>
+        <button onclick="exportExcel()" class="w-full btn-gradient flex items-center justify-center gap-2">
+          <i data-lucide="download" class="w-5 h-5"></i> Экспорт в Excel
+        </button>
+      </div>
+    </aside>
+
+    <!-- Основная область -->
+    <main class="flex-1 p-6">
+      <!-- Вкладка Загрузка -->
+      <div id="content-upload" class="tab-content">
+        <div class="glass p-8 rounded-2xl fade-in">
+          <h2 class="text-3xl font-bold mb-6 bg-clip-text text-transparent bg-gradient-to-r from-cyan-400 to-purple-400">
+            Smart Mapping Wizard
+          </h2>
+          <p class="text-gray-300 mb-8">
+            Поместите PDF файлы в папку <code class="bg-white/10 px-2 py-1 rounded">incoming/</code> для обработки и настройки экспорта.
+          </p>
+
+          <!-- Карточки типов документов -->
+          <div id="document-cards" class="flex gap-6 overflow-x-auto pb-4 hidden">
+            <!-- Карточки будут добавлены динамически -->
+          </div>
+
+          <!-- Старые карточки (показываются до обработки) -->
+          <div id="initial-cards" class="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div class="glass p-6 rounded-xl">
+              <div class="flex items-center gap-3 mb-4">
+                <i data-lucide="folder-open" class="w-8 h-8 text-cyan-400"></i>
+                <h3 class="text-xl font-semibold">Incoming</h3>
+              </div>
+              <p class="text-gray-400">Файлы для обработки</p>
+              <div class="mt-4">
+                <div class="w-full bg-white/10 rounded-full h-2">
+                  <div id="progress-incoming" class="bg-cyan-500 h-2 rounded-full" style="width: 0%"></div>
+                </div>
+              </div>
+            </div>
+
+            <div class="glass p-6 rounded-xl">
+              <div class="flex items-center gap-3 mb-4">
+                <i data-lucide="check-circle" class="w-8 h-8 text-green-400"></i>
+                <h3 class="text-xl font-semibold">Processed</h3>
+              </div>
+              <p class="text-gray-400">Обработанные файлы</p>
+              <div class="mt-4">
+                <div class="w-full bg-white/10 rounded-full h-2">
+                  <div id="progress-processed" class="bg-green-500 h-2 rounded-full" style="width: 0%"></div>
+                </div>
+              </div>
+            </div>
+
+            <div class="glass p-6 rounded-xl">
+              <div class="flex items-center gap-3 mb-4">
+                <i data-lucide="file-text" class="w-8 h-8 text-purple-400"></i>
+                <h3 class="text-xl font-semibold">Results</h3>
+              </div>
+              <p class="text-gray-400">Результаты парсинга</p>
+              <div class="mt-4">
+                <div class="w-full bg-white/10 rounded-full h-2">
+                  <div id="progress-results" class="bg-purple-500 h-2 rounded-full" style="width: 0%"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Кнопка финального экспорта -->
+          <div id="final-export" class="mt-8 text-center hidden">
+            <button onclick="runFinalExport()" class="btn-gradient text-lg px-8 py-4">
+              <i data-lucide="download" class="w-6 h-6 inline mr-3"></i>
+              Запустить автоматический экспорт во все файлы
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Вкладка Результаты -->
+      <div id="content-results" class="tab-content hidden">
+        <div class="glass p-8 rounded-2xl fade-in">
+          <h2 class="text-3xl font-bold mb-6 bg-clip-text text-transparent bg-gradient-to-r from-cyan-400 to-purple-400">
+            Результаты обработки
+          </h2>
+
+          <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+              <thead>
+                <tr class="border-b border-white/20">
+                  <th class="text-left p-3">Файл</th>
+                  <th class="text-left p-3">Тип документа</th>
+                  <th class="text-left p-3">Поля</th>
+                  <th class="text-left p-3">Статус</th>
+                </tr>
+              </thead>
+              <tbody id="results-table">
+                <!-- Данные будут загружены динамически -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- Модальное окно Smart Mapping Wizard -->
+  <div id="mapping-modal" class="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 hidden">
+    <div class="max-w-7xl mx-auto h-full p-8 grid grid-cols-12 gap-8">
+      <!-- Левая колонка -->
+      <div class="col-span-4 glass p-6 rounded-2xl">
+        <h3 class="text-xl font-bold mb-4 bg-clip-text text-transparent bg-gradient-to-r from-cyan-400 to-purple-400">
+          Доступные поля
+        </h3>
+        <div id="available-fields" class="space-y-2 max-h-96 overflow-y-auto">
+          <!-- Поля будут добавлены динамически -->
+        </div>
+      </div>
+
+      <!-- Правая колонка -->
+      <div class="col-span-8 glass p-6 rounded-2xl">
+        <div class="space-y-6">
+          <!-- Радио-кнопки выбора типа файла -->
+          <div class="space-y-3">
+            <label class="flex items-center gap-3">
+              <input type="radio" name="file-type" value="existing" class="text-cyan-400" checked>
+              <span>В существующий Excel-файл</span>
+              <input type="file" id="existing-file" accept=".xlsx,.xls" class="ml-4 text-sm">
+            </label>
+            <label class="flex items-center gap-3">
+              <input type="radio" name="file-type" value="new">
+              <span>Создать новый файл</span>
+              <input type="text" id="new-file-name" placeholder="Название файла.xlsx" class="ml-4 bg-white/10 rounded px-3 py-1 text-sm">
+            </label>
+          </div>
+
+          <!-- Область drop-zone -->
+          <div id="drop-zone" class="min-h-96 border-2 border-dashed border-white/20 rounded-xl p-4">
+            <!-- Таблица будет добавлена динамически -->
+          </div>
+        </div>
+
+        <!-- Кнопки управления -->
+        <div class="flex justify-end gap-4 mt-6">
+          <button onclick="closeModal()" class="px-6 py-2 bg-white/10 rounded-lg hover:bg-white/20 transition-all">
+            Отмена
+          </button>
+          <button onclick="saveMapping()" class="btn-gradient">
+            Сохранить маппинг и продолжить →
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast контейнер -->
+  <div id="toast-container" class="fixed bottom-6 right-6 z-50 flex flex-col gap-3"></div>
+
+  <!-- Модальное окно -->
+  <div id="custom-modal" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 hidden">
+    <div class="max-w-lg mx-auto mt-24 glass rounded-3xl p-8 shadow-2xl modal-enter">
+      <div class="flex items-center gap-3 mb-6">
+        <i id="modal-icon" data-lucide="info" class="w-8 h-8 text-cyan-400"></i>
+        <h3 id="modal-title" class="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-cyan-400 to-purple-400">Заголовок</h3>
+      </div>
+      <p id="modal-message" class="text-gray-300 mb-8">Сообщение</p>
+      <div id="modal-buttons" class="flex justify-end gap-4"></div>
+    </div>
+  </div>
+
+  <script type="text/javascript" src="/eel.js"></script>
+  <script>
+    let currentDocType = '';
+    let documentGroups = {};
+    let mappedTypes = new Set();
+
+    function showTab(tab) {
+      document.querySelectorAll('.tab-content').forEach(c => c.classList.add('hidden'));
+      document.querySelectorAll('.sidebar-item').forEach(b => b.classList.remove('tab-active'));
+      document.getElementById('content-' + tab).classList.remove('hidden');
+      document.getElementById('tab-' + tab).classList.add('tab-active');
+    }
+
+    async function updateCounts() {
+      const data = await eel.get_folder_counts()();
+      document.getElementById('count-incoming').textContent = data.incoming;
+      document.getElementById('count-processed').textContent = data.processed;
+      document.getElementById('count-results').textContent = data.results;
+
+      // Анимированные прогресс-бары
+      const total = data.incoming + data.processed + data.results;
+      if (total > 0) {
+        document.getElementById('progress-incoming').style.width = (data.incoming / total * 100) + '%';
+        document.getElementById('progress-processed').style.width = (data.processed / total * 100) + '%';
+        document.getElementById('progress-results').style.width = (data.results / total * 100) + '%';
+      }
+    }
+
+    async function runParsing() {
+      const button = event.target.closest('button');
+      button.disabled = true;
+      button.innerHTML = '<i data-lucide="loader" class="w-6 h-6 inline mr-2 animate-spin"></i> Обработка...';
+      lucide.createIcons();
+
+      const res = await eel.run_parsing('{}')();
+      if (res.status === 'success') {
+        documentGroups = res.data.document_groups;
+        renderDocumentCards();
+        document.getElementById('initial-cards').classList.add('hidden');
+        document.getElementById('document-cards').classList.remove('hidden');
+        showToast('Обработка завершена! Настройте экспорт для каждого типа документов.', 'success');
+      } else {
+        showToast(res.message, 'error');
+      }
+
+      button.disabled = false;
+      button.innerHTML = '<i data-lucide="play" class="w-5 h-5 inline mr-2"></i> Запустить обработку';
+      lucide.createIcons();
+      updateCounts();
+    }
+
+    function renderDocumentCards() {
+      const container = document.getElementById('document-cards');
+      container.innerHTML = '';
+
+      Object.entries(documentGroups).forEach(([docType, data]) => {
+        const card = document.createElement('div');
+        const isLowConfidence = data.confidence < 0.85;
+        const isMapped = mappedTypes.has(docType);
+
+        card.className = `w-96 h-full glass p-6 rounded-xl flex flex-col transition-all ${
+          isMapped ? 'border-2 border-green-400' : isLowConfidence ? 'border-2 border-yellow-400' : 'border-2 border-cyan-400'
+        }`;
+        card.innerHTML = `
+          <div class="flex items-center justify-between mb-4">
+            <h3 class="text-lg font-bold">${docType.replace('_', ' ')} · ${data.count} шт</h3>
+            ${isMapped ? '<i data-lucide="check-circle" class="w-6 h-6 text-green-400"></i>' : ''}
+          </div>
+
+          <div class="mb-4">
+            <div class="flex justify-between text-sm mb-1">
+              <span>Уверенность классификации</span>
+              <span>${(data.confidence * 100).toFixed(1)}%</span>
+            </div>
+            <div class="w-full bg-white/10 rounded-full h-2">
+              <div class="bg-gradient-to-r from-cyan-400 to-purple-400 h-2 rounded-full" style="width: ${data.confidence * 100}%"></div>
+            </div>
+          </div>
+
+          <div class="flex-1 mb-4">
+            <h4 class="text-sm font-semibold mb-2">Извлечённые поля:</h4>
+            <div class="space-y-1 max-h-32 overflow-y-auto">
+              ${Object.entries(data.fields).map(([field, count]) =>
+                `<div class="flex justify-between text-sm draggable-chip bg-white/10 px-3 py-1 rounded-full">
+                  <span>${field}</span>
+                  <span class="text-cyan-400">[${count}/${data.count}]</span>
+                </div>`
+              ).join('')}
+            </div>
+          </div>
+
+          <div class="space-y-2">
+            ${isLowConfidence ? `
+              <button onclick="helpImprove('${docType}')" class="w-full btn-gradient text-sm py-2">
+                <i data-lucide="help-circle" class="w-4 h-4 inline mr-2"></i> Помочь улучшить
+              </button>
+            ` : ''}
+            <button onclick="openMappingWizard('${docType}')" class="w-full btn-gradient text-sm py-2" ${isMapped ? 'disabled' : ''}>
+              ${isMapped ? 'Настроено ✓' : 'Настроить экспорт →'}
+            </button>
+          </div>
+        `;
+        container.appendChild(card);
+      });
+
+      lucide.createIcons();
+    }
+
+    function openMappingWizard(docType) {
+      currentDocType = docType;
+      const modal = document.getElementById('mapping-modal');
+      modal.classList.remove('hidden');
+
+      // Заполняем доступные поля
+      const fieldsContainer = document.getElementById('available-fields');
+      fieldsContainer.innerHTML = '';
+
+      Object.keys(documentGroups[docType].fields).forEach(field => {
+        const chip = document.createElement('div');
+        chip.className = 'draggable-chip bg-gradient-to-r from-cyan-400 to-purple-400 px-4 py-2 rounded-full cursor-grab text-white text-sm font-medium shadow-lg';
+        chip.draggable = true;
+        chip.textContent = field;
+        chip.dataset.field = field;
+        fieldsContainer.appendChild(chip);
+      });
+
+      // Создаем таблицу-превью
+      createPreviewTable();
+      setupDragAndDrop();
+    }
+
+    function createPreviewTable() {
+      const dropZone = document.getElementById('drop-zone');
+      const fileType = document.querySelector('input[name="file-type"]:checked').value;
+
+      if (fileType === 'existing') {
+        // Имитация существующего файла
+        dropZone.innerHTML = `
+          <div class="text-center text-gray-400 mb-4">Превью Excel файла</div>
+          <div class="grid grid-cols-10 gap-1 max-h-80 overflow-auto">
+            ${Array.from({length: 200}, (_, i) => {
+              const col = String.fromCharCode(65 + (i % 10));
+              const row = Math.floor(i / 10) + 1;
+              return `<div class="cell drop-target" data-cell="${col}${row}">${i < 10 ? `Заголовок ${col}` : ''}</div>`;
+            }).join('')}
+          </div>
+        `;
+      } else {
+        // Новая таблица
+        dropZone.innerHTML = `
+          <div class="text-center text-gray-400 mb-4">Новая таблица Excel</div>
+          <div class="grid grid-cols-8 gap-1 max-h-80 overflow-auto">
+            ${Array.from({length: 64}, (_, i) => {
+              const col = String.fromCharCode(65 + (i % 8));
+              const row = Math.floor(i / 8) + 1;
+              return `<div class="cell drop-target ${row === 1 ? 'bg-cyan-500/10' : ''}" data-cell="${col}${row}"></div>`;
+            }).join('')}
+          </div>
+        `;
+      }
+    }
+
+    function setupDragAndDrop() {
+      let draggedElement = null;
+
+      document.addEventListener('dragstart', e => {
+        if (e.target.classList.contains('draggable-chip')) {
+          draggedElement = e.target;
+          e.target.style.opacity = '0.5';
+        }
+      });
+
+      document.addEventListener('dragend', e => {
+        if (draggedElement) {
+          draggedElement.style.opacity = '1';
+          draggedElement = null;
+        }
+      });
+
+      document.addEventListener('dragover', e => {
+        e.preventDefault();
+        if (e.target.classList.contains('drop-target')) {
+          e.target.style.borderColor = 'var(--cyan)';
+          e.target.style.borderWidth = '4px';
+        }
+      });
+
+      document.addEventListener('dragleave', e => {
+        if (e.target.classList.contains('drop-target')) {
+          e.target.style.borderColor = '';
+          e.target.style.borderWidth = '';
+        }
+      });
+
+      document.addEventListener('drop', e => {
+        e.preventDefault();
+        if (e.target.classList.contains('drop-target') && draggedElement) {
+          const fieldName = draggedElement.dataset.field;
+          e.target.textContent = fieldName;
+          e.target.classList.add('bg-cyan-500/20');
+          e.target.style.borderColor = '';
+          e.target.style.borderWidth = '';
+
+          // Делаем чип неактивным
+          draggedElement.style.opacity = '0.3';
+          draggedElement.draggable = false;
+        }
+      });
+
+      // Правый клик для отмены
+      document.addEventListener('contextmenu', e => {
+        if (e.target.classList.contains('drop-target') && e.target.textContent) {
+          e.preventDefault();
+          const fieldName = e.target.textContent;
+          e.target.textContent = '';
+          e.target.classList.remove('bg-cyan-500/20');
+
+          // Возвращаем чип
+          const chips = document.querySelectorAll('.draggable-chip');
+          chips.forEach(chip => {
+            if (chip.dataset.field === fieldName) {
+              chip.style.opacity = '1';
+              chip.draggable = true;
+            }
+          });
+        }
+      });
+    }
+
+    async function saveMapping() {
+      const fileType = document.querySelector('input[name="file-type"]:checked').value;
+      const mapping = {};
+
+      document.querySelectorAll('.drop-target').forEach(cell => {
+        if (cell.textContent) {
+          mapping[cell.dataset.cell] = cell.textContent;
+        }
+      });
+
+      const mappingData = {
+        target: fileType,
+        filename: fileType === 'existing' ?
+          document.getElementById('existing-file').files[0]?.name || 'existing.xlsx' :
+          document.getElementById('new-file-name').value || `${currentDocType}.xlsx`,
+        sheet: 'Лист1',
+        mapping: mapping
+      };
+
+      const res = await eel.save_mapping(currentDocType, mappingData)();
+      if (res.status === 'success') {
+        mappedTypes.add(currentDocType);
+        renderDocumentCards();
+        checkAllMapped();
+        closeModal();
+        showToast('Маппинг сохранен успешно!', 'success');
+      } else {
+        showToast(res.message, 'error');
+      }
+    }
+
+    function checkAllMapped() {
+      const totalTypes = Object.keys(documentGroups).length;
+      if (mappedTypes.size === totalTypes) {
+        document.getElementById('final-export').classList.remove('hidden');
+      }
+    }
+
+    function closeModal() {
+      document.getElementById('mapping-modal').classList.add('hidden');
+    }
+
+    function helpImprove(docType) {
+      // TODO: Реализовать функцию помощи в улучшении
+      showToast(`Функция помощи для типа "${docType}" будет реализована позже.`, 'info');
+    }
+
+    async function runFinalExport() {
+      // TODO: Реализовать финальный экспорт
+      showToast('Финальный экспорт будет реализован после настройки всех маппингов.', 'info');
+    }
+
+    async function exportExcel() {
+      const res = await eel.export_to_excel()();
+      showToast(res.message, 'info');
+    }
+
+    // Обработчики изменения типа файла
+    document.addEventListener('change', e => {
+      if (e.target.name === 'file-type') {
+        createPreviewTable();
+      }
+    });
+
+    // Кастомные уведомления
+    function showToast(message, type = 'info') {
+      const container = document.getElementById('toast-container');
+      const toast = document.createElement('div');
+      const icons = { success: 'check-circle', error: 'x-circle', warning: 'alert-triangle', info: 'info' };
+      const colors = { success: 'text-green-400', error: 'text-red-400', warning: 'text-yellow-400', info: 'text-cyan-400' };
+
+      toast.className = 'glass max-w-md rounded-2xl p-5 shadow-2xl toast-enter flex items-start gap-4';
+      toast.innerHTML = `
+        <i data-lucide="${icons[type]}" class="w-6 h-6 ${colors[type]} flex-shrink-0 mt-0.5"></i>
+        <div class="flex-1">
+          <p class="text-sm text-gray-200">${message}</p>
+        </div>
+        <button onclick="this.parentElement.remove()" class="text-gray-400 hover:text-white transition-colors">
+          <i data-lucide="x" class="w-4 h-4"></i>
+        </button>
+      `;
+
+      container.appendChild(toast);
+      lucide.createIcons();
+
+      setTimeout(() => {
+        if (toast.parentElement) {
+          toast.remove();
+        }
+      }, 4000);
+    }
+
+    async function showModal(title, message, buttons = ['OK']) {
+      return new Promise((resolve) => {
+        const modal = document.getElementById('custom-modal');
+        const titleEl = document.getElementById('modal-title');
+        const messageEl = document.getElementById('modal-message');
+        const buttonsEl = document.getElementById('modal-buttons');
+        const iconEl = document.getElementById('modal-icon');
+
+        titleEl.textContent = title;
+        messageEl.textContent = message;
+        buttonsEl.innerHTML = '';
+
+        buttons.forEach((btnText, index) => {
+          const btn = document.createElement('button');
+          btn.className = 'btn-gradient';
+          btn.textContent = btnText;
+          btn.onclick = () => {
+            modal.classList.add('hidden');
+            resolve(btnText);
+          };
+          buttonsEl.appendChild(btn);
+        });
+
+        // Обработчик Esc
+        const escHandler = (e) => {
+          if (e.key === 'Escape') {
+            modal.classList.add('hidden');
+            resolve(null);
+            document.removeEventListener('keydown', escHandler);
+          }
+        };
+        document.addEventListener('keydown', escHandler);
+
+        // Клик по overlay
+        modal.onclick = (e) => {
+          if (e.target === modal) {
+            modal.classList.add('hidden');
+            resolve(null);
+            document.removeEventListener('keydown', escHandler);
+          }
+        };
+
+        modal.classList.remove('hidden');
+        lucide.createIcons();
+      });
+    }
+
+    async function showConfirm(title, message) {
+      const result = await showModal(title, message, ['Отмена', 'Подтвердить']);
+      return result === 'Подтвердить';
+    }
+
+    async function showPrompt(title, message, defaultValue = '') {
+      const modal = document.getElementById('custom-modal');
+      const messageEl = document.getElementById('modal-message');
+      const buttonsEl = document.getElementById('modal-buttons');
+
+      // Добавляем input
+      messageEl.innerHTML = `
+        <p class="mb-4">${message}</p>
+        <input type="text" value="${defaultValue}" class="w-full bg-white/10 rounded-lg px-4 py-3 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-cyan-400" id="prompt-input">
+      `;
+
+      buttonsEl.innerHTML = `
+        <button class="px-6 py-2 bg-white/10 rounded-lg hover:bg-white/20 transition-all" onclick="this.closest('#custom-modal').classList.add('hidden')">Отмена</button>
+        <button class="btn-gradient" onclick="this.closest('#custom-modal').classList.add('hidden')">OK</button>
+      `;
+
+      return new Promise((resolve) => {
+        const okBtn = buttonsEl.querySelector('.btn-gradient');
+        const cancelBtn = buttonsEl.querySelector('button:not(.btn-gradient)');
+
+        okBtn.onclick = () => {
+          const value = document.getElementById('prompt-input').value;
+          modal.classList.add('hidden');
+          resolve(value);
+        };
+
+        cancelBtn.onclick = () => {
+          modal.classList.add('hidden');
+          resolve(null);
+        };
+
+        // Обработчик Esc
+        const escHandler = (e) => {
+          if (e.key === 'Escape') {
+            modal.classList.add('hidden');
+            resolve(null);
+            document.removeEventListener('keydown', escHandler);
+          }
+        };
+        document.addEventListener('keydown', escHandler);
+
+        // Клик по overlay
+        modal.onclick = (e) => {
+          if (e.target === modal) {
+            modal.classList.add('hidden');
+            resolve(null);
+            document.removeEventListener('keydown', escHandler);
+          }
+        };
+
+        modal.classList.remove('hidden');
+        lucide.createIcons();
+        document.getElementById('prompt-input').focus();
+      });
+    }
+
+    setInterval(updateCounts, 2000);
+    showTab('upload');
+  </script>
+</body>
+</html>

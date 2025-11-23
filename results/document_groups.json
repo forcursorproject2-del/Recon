@@ -1,0 +1,15 @@
+{
+  "document_groups": {
+    "unknown": {
+      "count": 1,
+      "confidence": 0.0,
+      "fields": {
+        "inn": 1,
+        "kpp": 1,
+        "amount": 1,
+        "date": 1
+      }
+    }
+  },
+  "total_files": 1
+}

@@ -1,0 +1,21 @@
+{
+  "summary": {
+    "total_documents": 0,
+    "classification_stats": {
+      "classified": 0,
+      "uncertain": 0,
+      "types": {}
+    },
+    "field_coverage": {},
+    "recommendations": [
+      "No documents processed. Nothing to analyze."
+    ],
+    "metrics": {
+      "classification_f1": 0.0,
+      "field_accuracy": {},
+      "auto_corrections": 0,
+      "intellect_score": 0.0
+    }
+  },
+  "documents": {}
+}
