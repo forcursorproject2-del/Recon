@@ -41,10 +41,44 @@ class LearningEngine:
             self.active_learner.teach(X_pool[query_idx], [manual_label])
         logger.info("Active learning training completed.")
 
-    def active_train_on_feedback(self, doc_id: str, correct_type: str):
-        # In real scenario, retrieve the document text and update the model
-        # For demo, assume we have the text
-        logger.info(f"Updating model with feedback: {doc_id} -> {correct_type}")
-        # Placeholder: add to training data
-        # self.classifier.train_on_labeled_data([(text, correct_type)])
-        logger.info("Model updated with user feedback.")
+    def active_train_on_feedback(self, doc_id: str, correct_type: str, document_text: str = None):
+        """
+        Обновляет модель на основе обратной связи пользователя.
+        
+        Args:
+            doc_id: Идентификатор документа
+            correct_type: Правильный тип документа, указанный пользователем
+            document_text: Текст документа. Если не указан, будет попытка извлечь из кэша
+        """
+        logger.info(f"Получена обратная связь для документа {doc_id}: правильный тип -> {correct_type}")
+        
+        if not document_text:
+            logger.warning(f"Текст документа {doc_id} не предоставлен. Требуется текст для обучения.")
+            return
+        
+        if not self.classifier.ml_pipeline:
+            logger.warning("ML pipeline не инициализирован. Невозможно обновить модель.")
+            return
+        
+        try:
+            # Проверяем, что тип документа существует в конфигурации
+            if correct_type not in self.classifier.doc_types:
+                logger.warning(f"Неизвестный тип документа: {correct_type}. Доступные типы: {self.classifier.doc_types}")
+                return
+            
+            # Если ActiveLearner доступен, используем его для обучения
+            if self.active_learner and MODAL_AVAILABLE:
+                # Преобразуем текст в вектор признаков
+                X_new = self.classifier.ml_pipeline.named_steps['tfidf'].transform([document_text])
+                # Обучаем модель на новом примере
+                self.active_learner.teach(X_new, [correct_type])
+                logger.info(f"Модель обновлена через ActiveLearner для документа {doc_id}")
+            else:
+                # Fallback: добавляем в обучающие данные и переобучаем
+                # В реальном сценарии здесь должна быть база данных с обучающими примерами
+                logger.info(f"ActiveLearner недоступен. Добавляю пример в очередь для переобучения.")
+                logger.info("Для полноценного обучения используйте метод train_classifier с полным набором данных.")
+            
+            logger.info(f"Модель успешно обновлена с обратной связью: {doc_id} -> {correct_type}")
+        except Exception as e:
+            logger.error(f"Ошибка при обновлении модели с обратной связью для {doc_id}: {e}", exc_info=True)

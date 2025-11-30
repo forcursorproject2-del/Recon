@@ -84,7 +84,37 @@ class ConfigManager:
         return self.config.get('document_signatures', {})
 
     def get_patterns(self) -> Dict[str, Any]:
-        return self.config.get('field_patterns', {})
+        """
+        Получает паттерны полей с поддержкой нового формата (приоритеты) и старого.
+        
+        Returns:
+            Словарь паттернов, где каждый паттерн может быть:
+            - Старый формат: {'pattern': '...', 'validate': '...'}
+            - Новый формат: {'patterns': [{'pattern': '...', 'priority': 10, ...}], 'validate': '...'}
+        """
+        patterns = self.config.get('field_patterns', {})
+        
+        # Конвертируем старый формат в новый для обратной совместимости
+        converted_patterns = {}
+        for field_name, pat in patterns.items():
+            if 'patterns' in pat:
+                # Уже новый формат
+                converted_patterns[field_name] = pat
+            elif 'pattern' in pat:
+                # Старый формат - конвертируем
+                converted_patterns[field_name] = {
+                    'patterns': [{
+                        'pattern': pat['pattern'],
+                        'priority': 5,  # Средний приоритет по умолчанию
+                        'context_keywords': []
+                    }],
+                    'validate': pat.get('validate', 'text')
+                }
+            else:
+                # Неизвестный формат, пропускаем
+                continue
+        
+        return converted_patterns
 
     def get_classifier_mode(self) -> str:
         return self.config.get("classifier", {}).get("mode", "rules_only")

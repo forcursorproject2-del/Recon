@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Core Parser</title>
+  <title>Парсер документов</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
   <script>
@@ -41,6 +41,20 @@
     @keyframes scaleIn { from { transform: scale(0.9); opacity: 0; } to { transform: scale(1); opacity: 1; } }
     .toast-enter { animation: slideInFromRight 0.3s ease-out; }
     .modal-enter { animation: scaleIn 0.3s ease-out; }
+    /* Адаптивная сетка карточек */
+    #document-cards {
+      grid-template-rows: repeat(auto-fit, minmax(400px, 1fr));
+    }
+    @media (max-width: 1024px) {
+      #document-cards {
+        grid-template-rows: repeat(auto-fit, minmax(350px, 1fr));
+      }
+    }
+    @media (max-width: 768px) {
+      #document-cards {
+        grid-template-rows: repeat(auto-fit, minmax(300px, 1fr));
+      }
+    }
   </style>
 </head>
 <body class="h-full text-gray-100 overflow-hidden">
@@ -51,11 +65,14 @@
       <div class="flex items-center gap-3">
         <i data-lucide="zap" class="w-9 h-9 text-cyan-400"></i>
         <h1 class="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-cyan-400 to-purple-400">
-          Core Parser
+          Парсер документов
         </h1>
       </div>
 
       <nav class="space-y-2">
+        <button onclick="showTab('history')" id="tab-history" class="w-full text-left p-3 rounded-xl bg-white/10 hover:bg-white/20 transition-all flex items-center gap-3 tab-active">
+          <i data-lucide="history" class="w-5 h-5"></i> История
+        </button>
         <button onclick="showTab('upload')" id="tab-upload" class="w-full text-left p-3 rounded-xl bg-white/10 hover:bg-white/20 transition-all flex items-center gap-3">
           <i data-lucide="upload" class="w-5 h-5"></i> Загрузка
         </button>
@@ -90,28 +107,28 @@
     </aside>
 
     <!-- Основная область -->
-    <main class="flex-1 p-6">
+    <main class="flex-1 p-6 overflow-hidden flex flex-col">
       <!-- Вкладка Загрузка -->
-      <div id="content-upload" class="tab-content">
-        <div class="glass p-8 rounded-2xl fade-in">
-          <h2 class="text-3xl font-bold mb-6 bg-clip-text text-transparent bg-gradient-to-r from-cyan-400 to-purple-400">
-            Smart Mapping Wizard
+      <div id="content-upload" class="tab-content flex flex-col h-full min-h-0">
+        <div class="glass p-8 rounded-2xl fade-in flex flex-col h-full min-h-0">
+          <h2 class="text-3xl font-bold mb-6 bg-clip-text text-transparent bg-gradient-to-r from-cyan-400 to-purple-400 flex-shrink-0">
+            Мастер настройки экспорта
           </h2>
-          <p class="text-gray-300 mb-8">
+          <p class="text-gray-300 mb-8 flex-shrink-0">
             Поместите PDF файлы в папку <code class="bg-white/10 px-2 py-1 rounded">incoming/</code> для обработки и настройки экспорта.
           </p>
 
           <!-- Карточки типов документов -->
-          <div id="document-cards" class="flex gap-6 overflow-x-auto pb-4 hidden">
+          <div id="document-cards" class="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-6 auto-rows-fr flex-1 min-h-0 overflow-y-auto hidden">
             <!-- Карточки будут добавлены динамически -->
           </div>
 
           <!-- Старые карточки (показываются до обработки) -->
-          <div id="initial-cards" class="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div id="initial-cards" class="grid grid-cols-1 md:grid-cols-3 gap-6 flex-shrink-0">
             <div class="glass p-6 rounded-xl">
               <div class="flex items-center gap-3 mb-4">
                 <i data-lucide="folder-open" class="w-8 h-8 text-cyan-400"></i>
-                <h3 class="text-xl font-semibold">Incoming</h3>
+                <h3 class="text-xl font-semibold">Входящие</h3>
               </div>
               <p class="text-gray-400">Файлы для обработки</p>
               <div class="mt-4">
@@ -124,7 +141,7 @@
             <div class="glass p-6 rounded-xl">
               <div class="flex items-center gap-3 mb-4">
                 <i data-lucide="check-circle" class="w-8 h-8 text-green-400"></i>
-                <h3 class="text-xl font-semibold">Processed</h3>
+                <h3 class="text-xl font-semibold">Обработано</h3>
               </div>
               <p class="text-gray-400">Обработанные файлы</p>
               <div class="mt-4">
@@ -137,7 +154,7 @@
             <div class="glass p-6 rounded-xl">
               <div class="flex items-center gap-3 mb-4">
                 <i data-lucide="file-text" class="w-8 h-8 text-purple-400"></i>
-                <h3 class="text-xl font-semibold">Results</h3>
+                <h3 class="text-xl font-semibold">Результаты</h3>
               </div>
               <p class="text-gray-400">Результаты парсинга</p>
               <div class="mt-4">
@@ -149,11 +166,104 @@
           </div>
 
           <!-- Кнопка финального экспорта -->
-          <div id="final-export" class="mt-8 text-center hidden">
+          <div id="final-export" class="mt-8 text-center flex-shrink-0 hidden">
             <button onclick="runFinalExport()" class="btn-gradient text-lg px-8 py-4">
               <i data-lucide="download" class="w-6 h-6 inline mr-3"></i>
               Запустить автоматический экспорт во все файлы
             </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Вкладка История -->
+      <div id="content-history" class="tab-content flex flex-col h-full min-h-0">
+        <div class="glass p-8 rounded-2xl fade-in flex flex-col h-full min-h-0">
+          <!-- Статистика -->
+          <div id="history-stats" class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6 flex-shrink-0">
+            <div class="glass p-4 rounded-xl">
+              <div class="text-sm text-gray-400 mb-1">Всего обработано</div>
+              <div class="text-2xl font-bold text-cyan-400" id="stat-total">0</div>
+            </div>
+            <div class="glass p-4 rounded-xl">
+              <div class="text-sm text-gray-400 mb-1">Сегодня</div>
+              <div class="text-2xl font-bold text-green-400" id="stat-today">0</div>
+            </div>
+            <div class="glass p-4 rounded-xl">
+              <div class="text-sm text-gray-400 mb-1">С ошибками</div>
+              <div class="text-2xl font-bold text-red-400" id="stat-errors">0 <span class="text-sm">(<span id="stat-error-percent">0</span>%)</span></div>
+            </div>
+            <div class="glass p-4 rounded-xl">
+              <div class="text-sm text-gray-400 mb-1">Активный контрагент</div>
+              <div class="text-lg font-semibold text-purple-400" id="stat-contractor">-</div>
+            </div>
+          </div>
+
+          <!-- Фильтры и поиск -->
+          <div class="glass p-4 rounded-xl mb-6 flex-shrink-0">
+            <div class="grid grid-cols-1 md:grid-cols-5 gap-4">
+              <input type="text" id="history-search" placeholder="Поиск по файлу, ИНН, контрагенту..." 
+                     class="bg-white/10 rounded-lg px-4 py-2 text-sm" onkeyup="handleHistorySearch()">
+              <select id="history-filter-type" class="bg-white/10 rounded-lg px-4 py-2 text-sm" onchange="loadHistory()">
+                <option value="">Все типы</option>
+              </select>
+              <select id="history-filter-status" class="bg-white/10 rounded-lg px-4 py-2 text-sm" onchange="loadHistory()">
+                <option value="">Все статусы</option>
+                <option value="success">Успешно</option>
+                <option value="partial">Частично</option>
+                <option value="error">Ошибка</option>
+              </select>
+              <select id="history-filter-contractor" class="bg-white/10 rounded-lg px-4 py-2 text-sm" onchange="loadHistory()">
+                <option value="">Все контрагенты</option>
+              </select>
+              <div class="flex gap-2">
+                <button onclick="loadHistory()" class="btn-gradient px-4 py-2 text-sm flex items-center gap-2">
+                  <i data-lucide="search" class="w-4 h-4"></i> Поиск
+                </button>
+                <button onclick="exportHistory()" class="bg-purple-500 hover:bg-purple-600 px-4 py-2 rounded-lg text-sm flex items-center gap-2">
+                  <i data-lucide="download" class="w-4 h-4"></i> Excel
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Таблица истории -->
+          <div class="flex-1 min-h-0 overflow-auto">
+            <table class="w-full text-sm">
+              <thead class="sticky top-0 bg-dark-card z-10">
+                <tr class="border-b border-white/20">
+                  <th class="text-left p-3">Исходное имя файла</th>
+                  <th class="text-left p-3">Тип документа</th>
+                  <th class="text-left p-3">Статус</th>
+                  <th class="text-left p-3">Контрагент</th>
+                  <th class="text-left p-3">ИНН</th>
+                  <th class="text-left p-3">Дата документа</th>
+                  <th class="text-left p-3">Сумма</th>
+                  <th class="text-left p-3">Дата обработки</th>
+                  <th class="text-left p-3">Действия</th>
+                </tr>
+              </thead>
+              <tbody id="history-table">
+                <tr>
+                  <td colspan="9" class="text-center p-8 text-gray-400">Загрузка...</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <!-- Пагинация -->
+          <div id="history-pagination" class="flex justify-between items-center mt-4 flex-shrink-0">
+            <div class="text-sm text-gray-400">
+              Показано <span id="history-showing">0</span> из <span id="history-total">0</span>
+            </div>
+            <div class="flex gap-2">
+              <button onclick="historyPrevPage()" id="history-prev" class="px-4 py-2 bg-white/10 rounded-lg hover:bg-white/20 disabled:opacity-50" disabled>
+                <i data-lucide="chevron-left" class="w-4 h-4"></i>
+              </button>
+              <span class="px-4 py-2 text-sm" id="history-page-info">Страница 1</span>
+              <button onclick="historyNextPage()" id="history-next" class="px-4 py-2 bg-white/10 rounded-lg hover:bg-white/20 disabled:opacity-50" disabled>
+                <i data-lucide="chevron-right" class="w-4 h-4"></i>
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -242,7 +352,7 @@
     <div class="max-w-lg mx-auto mt-24 glass rounded-3xl p-8 shadow-2xl modal-enter">
       <div class="flex items-center gap-3 mb-6">
         <i id="modal-icon" data-lucide="info" class="w-8 h-8 text-cyan-400"></i>
-        <h3 id="modal-title" class="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-cyan-400 to-purple-400">Заголовок</h3>
+        <h3 id="modal-title" class="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-cyan-400 to-purple-400">Уведомление</h3>
       </div>
       <p id="modal-message" class="text-gray-300 mb-8">Сообщение</p>
       <div id="modal-buttons" class="flex justify-end gap-4"></div>
@@ -254,6 +364,178 @@
     let currentDocType = '';
     let documentGroups = {};
     let mappedTypes = new Set();
+    
+    // Функция для перевода типов документов на русский
+    function translateDocType(docType) {
+      const translations = {
+        'invoice': 'Счет на оплату',
+        'payment_order': 'Платежное поручение',
+        'act': 'Акт выполненных работ/услуг',
+        'invoice_factura': 'Счет-фактура',
+        'dismissal_act': 'Приказ об увольнении',
+        'reconciliation_act': 'Акт сверки взаиморасчётов',
+        'medical_report': 'Медицинский отчет / анализы',
+        'upd': 'УПД (Универсальный передаточный документ)',
+        'torg12': 'Товарная накладная ТОРГ-12',
+        'contract': 'Договор',
+        'receipt': 'Кассовый чек / Чек ККТ',
+        'advance_report': 'Авансовый отчёт (АО-1)',
+        'transport_note': 'Транспортная накладная (ТН)',
+        'corrective_invoice': 'Счёт-фактура корректировочный (КСФ)',
+        'corrective_upd': 'УПД корректировочный',
+        'power_of_attorney': 'Доверенность М-2 / М-2а',
+        'cash_receipt_order': 'Приходный кассовый ордер (КО-1)',
+        'cash_expense_order': 'Расходный кассовый ордер (КО-2)',
+        'payroll_statement': 'Зарплатная ведомость Т-53 / Т-49',
+        'employment_contract': 'Трудовой договор',
+        'tax_certificate': 'Справка 2-НДФЛ / Расчётный листок',
+        'ticket': 'Электронный билет (авиа, ж/д, автобус)',
+        'unknown': 'Неизвестный тип'
+      };
+      return translations[docType] || docType.replace('_', ' ');
+    }
+    
+    // Функция для перевода названий полей на русский
+    function translateFieldName(fieldName) {
+      // Убираем префикс table_ при отображении
+      let displayName = fieldName.startsWith('table_') ? fieldName.substring(6) : fieldName;
+      
+      const translations = {
+        'inn': 'ИНН',
+        'kpp': 'КПП',
+        'amount': 'Сумма',
+        'date': 'Дата',
+        'document_number': 'Номер документа',
+        'supplier': 'Поставщик',
+        'buyer': 'Покупатель',
+        'supplier_inn': 'ИНН поставщика',
+        'buyer_inn': 'ИНН покупателя',
+        'bic': 'БИК',
+        'account_number': 'Номер счета',
+        'vat': 'НДС',
+        'total_with_vat': 'Итого с НДС',
+        'total_without_vat': 'Итого без НДС',
+        'patient_name': 'Имя пациента',
+        'patient_birthdate': 'Дата рождения пациента',
+        'analysis_date': 'Дата анализа',
+        'laboratory_name': 'Название лаборатории',
+        'employee_name': 'ФИО сотрудника',
+        'employee_number': 'Табельный номер',
+        'dismissal_date': 'Дата увольнения',
+        'dismissal_reason': 'Основание увольнения',
+        'labor_code_article': 'Статья ТК',
+        'seller': 'Продавец',
+        'seller_inn': 'ИНН продавца',
+        'seller_kpp': 'КПП продавца',
+        'shipper': 'Грузоотправитель',
+        'consignee': 'Грузополучатель',
+        'executor': 'Исполнитель',
+        'executor_inn': 'ИНН исполнителя',
+        'customer': 'Заказчик',
+        'customer_inn': 'ИНН заказчика',
+        'payer': 'Плательщик',
+        'payer_inn': 'ИНН плательщика',
+        'payer_kpp': 'КПП плательщика',
+        'payer_bic': 'БИК плательщика',
+        'recipient': 'Получатель',
+        'recipient_inn': 'ИНН получателя',
+        'recipient_kpp': 'КПП получателя',
+        'recipient_bic': 'БИК получателя',
+        'payment_purpose': 'Назначение платежа',
+        'period': 'Период',
+        'counterparty': 'Контрагент',
+        'counterparty_inn': 'ИНН контрагента',
+        'upd_status': 'Статус УПД',
+        'basis_document': 'Основание (договор, счёт)',
+        'basis_number': 'Номер основания',
+        'total_weight': 'Масса',
+        'contract_number': 'Номер договора',
+        'contract_date': 'Дата договора',
+        'party1': 'Сторона 1',
+        'party2': 'Сторона 2',
+        'party1_inn': 'ИНН стороны 1',
+        'party2_inn': 'ИНН стороны 2',
+        'contract_subject': 'Предмет договора',
+        'contract_amount': 'Сумма договора',
+        'contract_period_start': 'Срок действия (начало)',
+        'contract_period_end': 'Срок действия (конец)',
+        'receipt_number': 'Номер чека',
+        'receipt_datetime': 'Дата/время',
+        'seller_inn_receipt': 'ИНН продавца',
+        'payment_type': 'Признак расчёта',
+        'fiscal_document_number': 'Фискальный номер',
+        'fiscal_storage_number': 'Номер фискального накопителя',
+        'fiscal_sign': 'Фискальный признак',
+        'qr_code': 'QR-код',
+        'report_number': 'Номер отчёта',
+        'report_date': 'Дата отчёта',
+        'amount_issued': 'Сумма выданная',
+        'amount_spent': 'Сумма израсходованная',
+        'amount_balance': 'Остаток',
+        'attached_documents': 'Приложенные документы',
+        'carrier': 'Перевозчик',
+        'vehicle_number': 'Номер ТС',
+        'driver_name': 'Водитель',
+        'driver_license': 'Водительское удостоверение',
+        'route': 'Маршрут',
+        'cargo_description': 'Описание груза',
+        'original_invoice_number': 'Номер исходного СФ',
+        'original_invoice_date': 'Дата исходного СФ',
+        'corrective_invoice_number': 'Номер КСФ',
+        'corrective_invoice_date': 'Дата КСФ',
+        'correction_reason': 'Причина исправления',
+        'amount_change': 'Изменение суммы',
+        'vat_change': 'Изменение НДС',
+        'original_upd_number': 'Номер исходного УПД',
+        'original_upd_date': 'Дата исходного УПД',
+        'corrective_upd_number': 'Номер корректировочного УПД',
+        'corrective_upd_date': 'Дата корректировочного УПД',
+        'issued_to': 'Кому выдана',
+        'issued_by': 'От кого',
+        'issued_by_inn': 'ИНН выдавшего',
+        'goods_description': 'На получение каких ТМЦ',
+        'validity_period': 'Срок действия',
+        'order_number': 'Номер ордера',
+        'received_from': 'От кого',
+        'basis': 'Основание',
+        'cashier_name': 'Кассир',
+        'issued_to_order': 'Кому',
+        'statement_number': 'Номер ведомости',
+        'accrued': 'Начислено',
+        'deducted': 'Удержано',
+        'to_pay': 'К выдаче',
+        'tax_base': 'Налоговая база',
+        'position': 'Должность',
+        'salary': 'Оклад',
+        'hire_date': 'Дата приёма',
+        'employer_name': 'Работодатель',
+        'employer_inn': 'ИНН работодателя',
+        'certificate_number': 'Номер справки',
+        'employee_inn': 'ИНН сотрудника',
+        'income': 'Доходы',
+        'deductions': 'Вычеты',
+        'withheld_ndfl': 'Удержанный НДФЛ',
+        'ticket_number': 'Номер билета',
+        'passenger_name': 'ФИО пассажира',
+        'route_ticket': 'Маршрут',
+        'departure_date': 'Дата отправления',
+        'departure_time': 'Время отправления',
+        'arrival_date': 'Дата прибытия',
+        'arrival_time': 'Время прибытия',
+        'price': 'Стоимость',
+        'ticket_type': 'Тип билета',
+        'organization_1': 'Организация 1',
+        'organization_2': 'Организация 2',
+        'items': 'Товары/услуги',
+        'saldo_start': 'Входящее сальдо',
+        'turnover_debit': 'Обороты по дебету',
+        'turnover_credit': 'Обороты по кредиту',
+        'saldo_end': 'Исходящее сальдо'
+      };
+      
+      // Если есть перевод - используем его, иначе возвращаем оригинальное название (уже без table_)
+      return translations[fieldName] || displayName;
+    }
 
     function showTab(tab) {
       document.querySelectorAll('.tab-content').forEach(c => c.classList.add('hidden'));
@@ -309,12 +591,12 @@
         const isLowConfidence = data.confidence < 0.85;
         const isMapped = mappedTypes.has(docType);
 
-        card.className = `w-96 h-full glass p-6 rounded-xl flex flex-col transition-all ${
+        card.className = `h-full glass p-6 rounded-xl flex flex-col transition-all min-h-0 ${
           isMapped ? 'border-2 border-green-400' : isLowConfidence ? 'border-2 border-yellow-400' : 'border-2 border-cyan-400'
         }`;
         card.innerHTML = `
           <div class="flex items-center justify-between mb-4">
-            <h3 class="text-lg font-bold">${docType.replace('_', ' ')} · ${data.count} шт</h3>
+            <h3 class="text-lg font-bold">${translateDocType(docType)} · ${data.count} шт</h3>
             ${isMapped ? '<i data-lucide="check-circle" class="w-6 h-6 text-green-400"></i>' : ''}
           </div>
 
@@ -328,19 +610,78 @@
             </div>
           </div>
 
-          <div class="flex-1 mb-4">
-            <h4 class="text-sm font-semibold mb-2">Извлечённые поля:</h4>
-            <div class="space-y-1 max-h-32 overflow-y-auto">
-              ${Object.entries(data.fields).map(([field, count]) =>
-                `<div class="flex justify-between text-sm draggable-chip bg-white/10 px-3 py-1 rounded-full">
-                  <span>${field}</span>
-                  <span class="text-cyan-400">[${count}/${data.count}]</span>
-                </div>`
-              ).join('')}
+          <div class="flex-1 mb-4 min-h-0 flex flex-col">
+            <h4 class="text-sm font-semibold mb-2 flex-shrink-0">Извлечённые поля:</h4>
+            <div class="space-y-1 flex-1 overflow-y-auto min-h-0">
+              ${(() => {
+                // Определяем избранные поля для этого типа документа
+                const preferredFields = {
+                  'invoice': ['document_number', 'date', 'supplier', 'buyer', 'supplier_inn', 'buyer_inn', 'amount', 'total_with_vat', 'total_without_vat', 'vat', 'bic', 'account_number'],
+                  'payment_order': ['document_number', 'date', 'payer', 'recipient', 'payer_inn', 'recipient_inn', 'payer_kpp', 'recipient_kpp', 'payer_bic', 'recipient_bic', 'amount', 'payment_purpose'],
+                  'act': ['document_number', 'date', 'executor', 'customer', 'executor_inn', 'customer_inn', 'amount', 'total_with_vat', 'total_without_vat', 'vat'],
+                  'invoice_factura': ['document_number', 'date', 'seller', 'buyer', 'seller_inn', 'buyer_inn', 'seller_kpp', 'buyer_kpp', 'shipper', 'consignee', 'amount', 'vat', 'total_with_vat'],
+                  'reconciliation_act': ['document_number', 'period', 'counterparty', 'counterparty_inn', 'saldo_start', 'turnover_debit', 'turnover_credit', 'saldo_end'],
+                  'dismissal_act': ['employee_name', 'employee_number', 'dismissal_date', 'dismissal_reason', 'labor_code_article'],
+                  'medical_report': ['patient_name', 'patient_birthdate', 'analysis_date', 'laboratory_name'],
+                  'upd': ['document_number', 'date', 'seller', 'buyer', 'seller_inn', 'buyer_inn', 'seller_kpp', 'buyer_kpp', 'upd_status', 'basis_document', 'basis_number', 'amount', 'vat', 'total_with_vat', 'shipper', 'consignee'],
+                  'torg12': ['document_number', 'date', 'shipper', 'consignee', 'supplier', 'buyer', 'supplier_inn', 'buyer_inn', 'supplier_kpp', 'buyer_kpp', 'total_weight'],
+                  'contract': ['contract_number', 'contract_date', 'party1', 'party2', 'party1_inn', 'party2_inn', 'contract_subject', 'contract_amount', 'contract_period_start', 'contract_period_end'],
+                  'receipt': ['receipt_number', 'receipt_datetime', 'seller_inn_receipt', 'amount', 'payment_type', 'fiscal_document_number', 'fiscal_storage_number', 'fiscal_sign', 'qr_code'],
+                  'advance_report': ['report_number', 'report_date', 'employee_name', 'amount_issued', 'amount_spent', 'amount_balance', 'attached_documents'],
+                  'transport_note': ['document_number', 'date', 'shipper', 'consignee', 'carrier', 'vehicle_number', 'driver_name', 'driver_license', 'route', 'cargo_description'],
+                  'corrective_invoice': ['original_invoice_number', 'original_invoice_date', 'corrective_invoice_number', 'corrective_invoice_date', 'seller', 'buyer', 'correction_reason', 'amount_change', 'vat_change'],
+                  'corrective_upd': ['original_upd_number', 'original_upd_date', 'corrective_upd_number', 'corrective_upd_date', 'seller', 'buyer', 'correction_reason', 'amount_change', 'vat_change'],
+                  'power_of_attorney': ['document_number', 'date', 'issued_to', 'issued_by', 'issued_by_inn', 'goods_description', 'validity_period'],
+                  'cash_receipt_order': ['order_number', 'date', 'received_from', 'amount', 'basis', 'cashier_name'],
+                  'cash_expense_order': ['order_number', 'date', 'issued_to_order', 'amount', 'basis', 'cashier_name'],
+                  'payroll_statement': ['statement_number', 'period', 'employee_name', 'employee_number', 'accrued', 'deducted', 'to_pay', 'tax_base'],
+                  'employment_contract': ['contract_number', 'contract_date', 'employee_name', 'position', 'salary', 'hire_date', 'employer_name', 'employer_inn'],
+                  'tax_certificate': ['certificate_number', 'period', 'employee_name', 'employee_inn', 'income', 'deductions', 'withheld_ndfl', 'tax_base'],
+                  'ticket': ['ticket_number', 'passenger_name', 'route_ticket', 'departure_date', 'departure_time', 'arrival_date', 'arrival_time', 'price', 'ticket_type']
+                };
+                const preferred = preferredFields[docType] || [];
+                const allFields = Object.entries(data.fields).filter(([field, count]) => count > 0);
+                const preferredFieldsList = [];
+                const otherFieldsList = [];
+                allFields.forEach(([field, count]) => {
+                  if (preferred.includes(field)) {
+                    preferredFieldsList.push([field, count]);
+                  } else {
+                    otherFieldsList.push([field, count]);
+                  }
+                });
+                preferredFieldsList.sort((a, b) => {
+                  const indexA = preferred.indexOf(a[0]);
+                  const indexB = preferred.indexOf(b[0]);
+                  return indexA - indexB;
+                });
+                let html = '';
+                if (preferredFieldsList.length > 0) {
+                  html += '<div class="text-xs font-semibold text-cyan-400 mb-1">⭐ Избранные</div>';
+                  html += preferredFieldsList.map(([field, count]) =>
+                    `<div class="flex justify-between text-sm draggable-chip bg-gradient-to-r from-cyan-400/20 to-purple-400/20 px-3 py-1 rounded-full mb-1">
+                      <span>${translateFieldName(field)}</span>
+                      <span class="text-cyan-400">[${count}/${data.count}]</span>
+                    </div>`
+                  ).join('');
+                }
+                if (otherFieldsList.length > 0) {
+                  if (preferredFieldsList.length > 0) {
+                    html += '<div class="text-xs font-semibold text-gray-400 mb-1 mt-2">Все поля</div>';
+                  }
+                  html += otherFieldsList.map(([field, count]) =>
+                    `<div class="flex justify-between text-sm draggable-chip bg-white/10 px-3 py-1 rounded-full mb-1">
+                      <span>${translateFieldName(field)}</span>
+                      <span class="text-cyan-400">[${count}/${data.count}]</span>
+                    </div>`
+                  ).join('');
+                }
+                return html;
+              })()}
             </div>
           </div>
 
-          <div class="space-y-2">
+          <div class="space-y-2 flex-shrink-0">
             ${isLowConfidence ? `
               <button onclick="helpImprove('${docType}')" class="w-full btn-gradient text-sm py-2">
                 <i data-lucide="help-circle" class="w-4 h-4 inline mr-2"></i> Помочь улучшить
@@ -366,11 +707,88 @@
       const fieldsContainer = document.getElementById('available-fields');
       fieldsContainer.innerHTML = '';
 
-      Object.keys(documentGroups[docType].fields).forEach(field => {
+      // Определяем избранные поля для этого типа документа
+      const preferredFields = {
+        'invoice': ['document_number', 'date', 'supplier', 'buyer', 'supplier_inn', 'buyer_inn', 'amount', 'total_with_vat', 'total_without_vat', 'vat', 'bic', 'account_number'],
+        'payment_order': ['document_number', 'date', 'payer', 'recipient', 'payer_inn', 'recipient_inn', 'payer_kpp', 'recipient_kpp', 'payer_bic', 'recipient_bic', 'amount', 'payment_purpose'],
+        'act': ['document_number', 'date', 'executor', 'customer', 'executor_inn', 'customer_inn', 'amount', 'total_with_vat', 'total_without_vat', 'vat'],
+        'invoice_factura': ['document_number', 'date', 'seller', 'buyer', 'seller_inn', 'buyer_inn', 'seller_kpp', 'buyer_kpp', 'shipper', 'consignee', 'amount', 'vat', 'total_with_vat'],
+        'reconciliation_act': ['document_number', 'period', 'counterparty', 'counterparty_inn', 'saldo_start', 'turnover_debit', 'turnover_credit', 'saldo_end'],
+        'dismissal_act': ['employee_name', 'employee_number', 'dismissal_date', 'dismissal_reason', 'labor_code_article'],
+        'medical_report': ['patient_name', 'patient_birthdate', 'analysis_date', 'laboratory_name'],
+        'upd': ['document_number', 'date', 'seller', 'buyer', 'seller_inn', 'buyer_inn', 'seller_kpp', 'buyer_kpp', 'upd_status', 'basis_document', 'basis_number', 'amount', 'vat', 'total_with_vat', 'shipper', 'consignee'],
+        'torg12': ['document_number', 'date', 'shipper', 'consignee', 'supplier', 'buyer', 'supplier_inn', 'buyer_inn', 'supplier_kpp', 'buyer_kpp', 'total_weight'],
+        'contract': ['contract_number', 'contract_date', 'party1', 'party2', 'party1_inn', 'party2_inn', 'contract_subject', 'contract_amount', 'contract_period_start', 'contract_period_end'],
+        'receipt': ['receipt_number', 'receipt_datetime', 'seller_inn_receipt', 'amount', 'payment_type', 'fiscal_document_number', 'fiscal_storage_number', 'fiscal_sign', 'qr_code'],
+        'advance_report': ['report_number', 'report_date', 'employee_name', 'amount_issued', 'amount_spent', 'amount_balance', 'attached_documents'],
+        'transport_note': ['document_number', 'date', 'shipper', 'consignee', 'carrier', 'vehicle_number', 'driver_name', 'driver_license', 'route', 'cargo_description'],
+        'corrective_invoice': ['original_invoice_number', 'original_invoice_date', 'corrective_invoice_number', 'corrective_invoice_date', 'seller', 'buyer', 'correction_reason', 'amount_change', 'vat_change'],
+        'corrective_upd': ['original_upd_number', 'original_upd_date', 'corrective_upd_number', 'corrective_upd_date', 'seller', 'buyer', 'correction_reason', 'amount_change', 'vat_change'],
+        'power_of_attorney': ['document_number', 'date', 'issued_to', 'issued_by', 'issued_by_inn', 'goods_description', 'validity_period'],
+        'cash_receipt_order': ['order_number', 'date', 'received_from', 'amount', 'basis', 'cashier_name'],
+        'cash_expense_order': ['order_number', 'date', 'issued_to_order', 'amount', 'basis', 'cashier_name'],
+        'payroll_statement': ['statement_number', 'period', 'employee_name', 'employee_number', 'accrued', 'deducted', 'to_pay', 'tax_base'],
+        'employment_contract': ['contract_number', 'contract_date', 'employee_name', 'position', 'salary', 'hire_date', 'employer_name', 'employer_inn'],
+        'tax_certificate': ['certificate_number', 'period', 'employee_name', 'employee_inn', 'income', 'deductions', 'withheld_ndfl', 'tax_base'],
+        'ticket': ['ticket_number', 'passenger_name', 'route_ticket', 'departure_date', 'departure_time', 'arrival_date', 'arrival_time', 'price', 'ticket_type']
+      };
+      
+      const preferred = preferredFields[docType] || [];
+      
+      // Разделяем поля на избранные и остальные
+      const allFields = Object.entries(documentGroups[docType].fields)
+        .filter(([field, count]) => count > 0);
+      
+      const preferredFieldsList = [];
+      const otherFieldsList = [];
+      
+      allFields.forEach(([field, count]) => {
+        if (preferred.includes(field)) {
+          preferredFieldsList.push([field, count]);
+        } else {
+          otherFieldsList.push([field, count]);
+        }
+      });
+      
+      // Сортируем избранные поля по порядку в списке preferred
+      preferredFieldsList.sort((a, b) => {
+        const indexA = preferred.indexOf(a[0]);
+        const indexB = preferred.indexOf(b[0]);
+        return indexA - indexB;
+      });
+      
+      // Создаем заголовок для избранных полей
+      if (preferredFieldsList.length > 0) {
+        const header = document.createElement('div');
+        header.className = 'text-xs font-semibold text-cyan-400 mb-2 mt-4';
+        header.textContent = '⭐ Избранные поля';
+        fieldsContainer.appendChild(header);
+      }
+      
+      // Добавляем избранные поля
+      preferredFieldsList.forEach(([field, count]) => {
         const chip = document.createElement('div');
-        chip.className = 'draggable-chip bg-gradient-to-r from-cyan-400 to-purple-400 px-4 py-2 rounded-full cursor-grab text-white text-sm font-medium shadow-lg';
+        chip.className = 'draggable-chip bg-gradient-to-r from-cyan-400 to-purple-400 px-4 py-2 rounded-full cursor-grab text-white text-sm font-medium shadow-lg mb-2';
         chip.draggable = true;
-        chip.textContent = field;
+        chip.textContent = translateFieldName(field);
+        chip.dataset.field = field;
+        fieldsContainer.appendChild(chip);
+      });
+      
+      // Создаем заголовок для остальных полей
+      if (otherFieldsList.length > 0) {
+        const header = document.createElement('div');
+        header.className = 'text-xs font-semibold text-gray-400 mb-2 mt-4';
+        header.textContent = 'Все поля';
+        fieldsContainer.appendChild(header);
+      }
+      
+      // Добавляем остальные поля
+      otherFieldsList.forEach(([field, count]) => {
+        const chip = document.createElement('div');
+        chip.className = 'draggable-chip bg-white/10 px-4 py-2 rounded-full cursor-grab text-white text-sm font-medium mb-2';
+        chip.draggable = true;
+        chip.textContent = translateFieldName(field);
         chip.dataset.field = field;
         fieldsContainer.appendChild(chip);
       });
@@ -387,19 +805,19 @@
       if (fileType === 'existing') {
         // Имитация существующего файла
         dropZone.innerHTML = `
-          <div class="text-center text-gray-400 mb-4">Превью Excel файла</div>
+          <div class="text-center text-gray-400 mb-4">Предпросмотр Excel файла</div>
           <div class="grid grid-cols-10 gap-1 max-h-80 overflow-auto">
             ${Array.from({length: 200}, (_, i) => {
               const col = String.fromCharCode(65 + (i % 10));
               const row = Math.floor(i / 10) + 1;
-              return `<div class="cell drop-target" data-cell="${col}${row}">${i < 10 ? `Заголовок ${col}` : ''}</div>`;
+              return `<div class="cell drop-target" data-cell="${col}${row}">${i < 10 ? `Колонка ${col}` : ''}</div>`;
             }).join('')}
           </div>
         `;
       } else {
         // Новая таблица
         dropZone.innerHTML = `
-          <div class="text-center text-gray-400 mb-4">Новая таблица Excel</div>
+          <div class="text-center text-gray-400 mb-4">Создание новой таблицы Excel</div>
           <div class="grid grid-cols-8 gap-1 max-h-80 overflow-auto">
             ${Array.from({length: 64}, (_, i) => {
               const col = String.fromCharCode(65 + (i % 8));
@@ -447,7 +865,10 @@
         e.preventDefault();
         if (e.target.classList.contains('drop-target') && draggedElement) {
           const fieldName = draggedElement.dataset.field;
-          e.target.textContent = fieldName;
+          // Сохраняем оригинальное имя в data-атрибуте для маппинга
+          e.target.dataset.fieldName = fieldName;
+          // Отображаем переведенное название
+          e.target.textContent = translateFieldName(fieldName);
           e.target.classList.add('bg-cyan-500/20');
           e.target.style.borderColor = '';
           e.target.style.borderWidth = '';
@@ -462,8 +883,9 @@
       document.addEventListener('contextmenu', e => {
         if (e.target.classList.contains('drop-target') && e.target.textContent) {
           e.preventDefault();
-          const fieldName = e.target.textContent;
+          const fieldName = e.target.dataset.fieldName || e.target.textContent;
           e.target.textContent = '';
+          e.target.dataset.fieldName = '';
           e.target.classList.remove('bg-cyan-500/20');
 
           // Возвращаем чип
@@ -483,8 +905,10 @@
       const mapping = {};
 
       document.querySelectorAll('.drop-target').forEach(cell => {
-        if (cell.textContent) {
-          mapping[cell.dataset.cell] = cell.textContent;
+        // Используем сохраненное оригинальное имя поля из data-атрибута
+        const fieldName = cell.dataset.fieldName;
+        if (fieldName) {
+          mapping[cell.dataset.cell] = fieldName;
         }
       });
 
@@ -520,14 +944,93 @@
       document.getElementById('mapping-modal').classList.add('hidden');
     }
 
-    function helpImprove(docType) {
-      // TODO: Реализовать функцию помощи в улучшении
-      showToast(`Функция помощи для типа "${docType}" будет реализована позже.`, 'info');
+    async function helpImprove(docType) {
+      try {
+        const confirmed = await showConfirm(
+          'Помочь улучшить классификацию',
+          `Вы хотите помочь улучшить классификацию для типа документа "${docType}"? Система запросит у вас правильные примеры для обучения модели.`
+        );
+        
+        if (!confirmed) {
+          return;
+        }
+        
+        const correctType = await showPrompt(
+          'Укажите правильный тип документа',
+          'Введите правильный тип документа для обучения модели:',
+          docType
+        );
+        
+        if (!correctType) {
+          return;
+        }
+        
+        // Получаем список документов этого типа
+        const documents = documentGroups[docType]?.documents || [];
+        if (documents.length === 0) {
+          showToast('Не найдено документов для обучения.', 'warning');
+          return;
+        }
+        
+        // Отправляем обратную связь на сервер
+        const res = await eel.submit_feedback(docType, correctType, documents)();
+        
+        if (res.status === 'success') {
+          showToast(`Спасибо! Ваша обратная связь принята. Модель будет улучшена после обработки.`, 'success');
+        } else {
+          showToast(res.message || 'Ошибка при отправке обратной связи.', 'error');
+        }
+      } catch (error) {
+        showToast(`Ошибка: ${error.message}`, 'error');
+      }
     }
 
     async function runFinalExport() {
-      // TODO: Реализовать финальный экспорт
-      showToast('Финальный экспорт будет реализован после настройки всех маппингов.', 'info');
+      try {
+        const button = event.target.closest('button');
+        if (button) {
+          button.disabled = true;
+          button.innerHTML = '<i data-lucide="loader" class="w-6 h-6 inline mr-3 animate-spin"></i> Экспорт...';
+          lucide.createIcons();
+        }
+        
+        const confirmed = await showConfirm(
+          'Запустить финальный экспорт',
+          'Выполнить экспорт всех обработанных документов в Excel файлы согласно настроенным маппингам?'
+        );
+        
+        if (!confirmed) {
+          if (button) {
+            button.disabled = false;
+            button.innerHTML = '<i data-lucide="download" class="w-6 h-6 inline mr-3"></i> Запустить автоматический экспорт во все файлы';
+            lucide.createIcons();
+          }
+          return;
+        }
+        
+        const res = await eel.run_final_export()();
+        
+        if (res.status === 'success') {
+          showToast(`Экспорт завершен успешно! Обработано файлов: ${res.count || 0}`, 'success');
+          updateCounts();
+        } else {
+          showToast(res.message || 'Ошибка при выполнении экспорта.', 'error');
+        }
+        
+        if (button) {
+          button.disabled = false;
+          button.innerHTML = '<i data-lucide="download" class="w-6 h-6 inline mr-3"></i> Запустить автоматический экспорт во все файлы';
+          lucide.createIcons();
+        }
+      } catch (error) {
+        showToast(`Ошибка при экспорте: ${error.message}`, 'error');
+        const button = event.target.closest('button');
+        if (button) {
+          button.disabled = false;
+          button.innerHTML = '<i data-lucide="download" class="w-6 h-6 inline mr-3"></i> Запустить автоматический экспорт во все файлы';
+          lucide.createIcons();
+        }
+      }
     }
 
     async function exportExcel() {
@@ -678,8 +1181,294 @@
       });
     }
 
+    // === История обработки ===
+    let historyPage = 1;
+    let historyPerPage = 50;
+    let historyFilters = {};
+
+    async function loadHistoryStats() {
+      try {
+        const res = await eel.get_history_statistics()();
+        if (res.status === 'success') {
+          const stats = res.data;
+          document.getElementById('stat-total').textContent = stats.total || 0;
+          document.getElementById('stat-today').textContent = stats.today || 0;
+          document.getElementById('stat-errors').innerHTML = `${stats.errors || 0} <span class="text-sm">(${stats.error_percent || 0}%)</span>`;
+          document.getElementById('stat-error-percent').textContent = stats.error_percent || 0;
+          
+          if (stats.top_contractor) {
+            document.getElementById('stat-contractor').textContent = `${stats.top_contractor.name} (${stats.top_contractor.count})`;
+          } else {
+            document.getElementById('stat-contractor').textContent = '-';
+          }
+        }
+      } catch (error) {
+        console.error('Ошибка загрузки статистики:', error);
+      }
+    }
+
+    async function loadHistory() {
+      try {
+        const search = document.getElementById('history-search').value.trim();
+        const docType = document.getElementById('history-filter-type').value;
+        const status = document.getElementById('history-filter-status').value;
+        const contractor = document.getElementById('history-filter-contractor').value;
+
+        historyFilters = {};
+        if (search) historyFilters.search = search;
+        if (docType) historyFilters.document_type = docType;
+        if (status) historyFilters.status = status;
+        if (contractor) historyFilters.contractor_inn = contractor;
+
+        const res = await eel.get_processing_history(historyPage, historyPerPage, JSON.stringify(historyFilters))();
+        
+        if (res.status === 'success') {
+          const data = res.data;
+          renderHistoryTable(data.documents);
+          updateHistoryPagination(data);
+        } else {
+          showToast('Ошибка загрузки истории: ' + (res.message || 'Неизвестная ошибка'), 'error');
+        }
+      } catch (error) {
+        console.error('Ошибка загрузки истории:', error);
+        showToast('Ошибка загрузки истории', 'error');
+      }
+    }
+
+    function renderHistoryTable(documents) {
+      const tbody = document.getElementById('history-table');
+      tbody.innerHTML = '';
+
+      if (documents.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="9" class="text-center p-8 text-gray-400">Нет данных</td></tr>';
+        return;
+      }
+
+      documents.forEach(doc => {
+        const row = document.createElement('tr');
+        row.className = 'border-b border-white/10 hover:bg-white/5 transition-colors';
+        
+        const statusClass = {
+          'success': 'text-green-400',
+          'partial': 'text-yellow-400',
+          'error': 'text-red-400'
+        }[doc.status] || 'text-gray-400';
+        
+        const statusText = {
+          'success': 'Успешно',
+          'partial': 'Частично',
+          'error': 'Ошибка'
+        }[doc.status] || doc.status;
+
+        const amount = doc.total_amount ? formatAmount(doc.total_amount) : '-';
+        const date = doc.document_date || '-';
+        const processedDate = doc.processed_at ? new Date(doc.processed_at).toLocaleString('ru-RU') : '-';
+
+        row.innerHTML = `
+          <td class="p-3">${escapeHtml(doc.original_filename || '-')}</td>
+          <td class="p-3">${translateDocType(doc.document_type || 'unknown')}</td>
+          <td class="p-3 ${statusClass}">${statusText}</td>
+          <td class="p-3">${escapeHtml(doc.contractor_name || '-')}</td>
+          <td class="p-3 font-mono">${doc.contractor_inn || '-'}</td>
+          <td class="p-3">${date}</td>
+          <td class="p-3">${amount}</td>
+          <td class="p-3 text-gray-400 text-xs">${processedDate}</td>
+          <td class="p-3">
+            <div class="flex gap-2">
+              ${doc.original_path ? `<button onclick="openHistoryFile('${escapeHtml(doc.original_path)}')" class="text-cyan-400 hover:text-cyan-300" title="Открыть PDF">
+                <i data-lucide="file" class="w-4 h-4"></i>
+              </button>` : ''}
+              ${doc.output_files && doc.output_files.json ? `<button onclick="openHistoryFile('${escapeHtml(doc.output_files.json)}')" class="text-purple-400 hover:text-purple-300" title="Открыть результат">
+                <i data-lucide="file-text" class="w-4 h-4"></i>
+              </button>` : ''}
+              <button onclick="reprocessHistoryDocument(${doc.id})" class="text-green-400 hover:text-green-300" title="Переобработать">
+                <i data-lucide="refresh-cw" class="w-4 h-4"></i>
+              </button>
+              <button onclick="deleteHistoryDocument(${doc.id})" class="text-red-400 hover:text-red-300" title="Удалить">
+                <i data-lucide="trash-2" class="w-4 h-4"></i>
+              </button>
+            </div>
+          </td>
+        `;
+        tbody.appendChild(row);
+      });
+
+      lucide.createIcons();
+    }
+
+    function updateHistoryPagination(data) {
+      document.getElementById('history-showing').textContent = data.documents.length;
+      document.getElementById('history-total').textContent = data.total;
+      document.getElementById('history-page-info').textContent = `Страница ${data.page} из ${data.total_pages || 1}`;
+      
+      document.getElementById('history-prev').disabled = data.page <= 1;
+      document.getElementById('history-next').disabled = data.page >= (data.total_pages || 1);
+    }
+
+    function historyPrevPage() {
+      if (historyPage > 1) {
+        historyPage--;
+        loadHistory();
+      }
+    }
+
+    function historyNextPage() {
+      historyPage++;
+      loadHistory();
+    }
+
+    async function openHistoryFile(filePath) {
+      try {
+        const res = await eel.open_file(filePath)();
+        if (res.status !== 'success') {
+          showToast('Ошибка открытия файла: ' + (res.message || 'Неизвестная ошибка'), 'error');
+        }
+      } catch (error) {
+        showToast('Ошибка открытия файла', 'error');
+      }
+    }
+
+    async function reprocessHistoryDocument(docId) {
+      if (!await showConfirm('Переобработать документ', 'Документ будет скопирован в папку incoming для переобработки. Продолжить?')) {
+        return;
+      }
+
+      try {
+        const res = await eel.reprocess_document(docId)();
+        if (res.status === 'success') {
+          showToast(res.message || 'Документ скопирован в папку incoming', 'success');
+        } else {
+          showToast('Ошибка: ' + (res.message || 'Неизвестная ошибка'), 'error');
+        }
+      } catch (error) {
+        showToast('Ошибка переобработки', 'error');
+      }
+    }
+
+    async function deleteHistoryDocument(docId) {
+      if (!await showConfirm('Удалить запись', 'Вы уверены, что хотите удалить эту запись из истории?')) {
+        return;
+      }
+
+      try {
+        const res = await eel.delete_from_history(docId)();
+        if (res.status === 'success') {
+          showToast('Запись удалена', 'success');
+          loadHistory();
+          loadHistoryStats();
+        } else {
+          showToast('Ошибка: ' + (res.message || 'Неизвестная ошибка'), 'error');
+        }
+      } catch (error) {
+        showToast('Ошибка удаления', 'error');
+      }
+    }
+
+    async function exportHistory() {
+      try {
+        const button = event.target.closest('button');
+        if (button) {
+          button.disabled = true;
+          button.innerHTML = '<i data-lucide="loader" class="w-4 h-4 animate-spin"></i>';
+          lucide.createIcons();
+        }
+
+        const res = await eel.export_history_to_excel(JSON.stringify(historyFilters))();
+        
+        if (res.status === 'success') {
+          showToast(`Экспорт завершен! Файл: ${res.file} (${res.count} записей)`, 'success');
+        } else {
+          showToast('Ошибка экспорта: ' + (res.message || 'Неизвестная ошибка'), 'error');
+        }
+
+        if (button) {
+          button.disabled = false;
+          button.innerHTML = '<i data-lucide="download" class="w-4 h-4"></i> Excel';
+          lucide.createIcons();
+        }
+      } catch (error) {
+        showToast('Ошибка экспорта', 'error');
+      }
+    }
+
+    async function loadContractorsList() {
+      try {
+        const res = await eel.get_contractors_list()();
+        if (res.status === 'success') {
+          const select = document.getElementById('history-filter-contractor');
+          select.innerHTML = '<option value="">Все контрагенты</option>';
+          res.data.forEach(contractor => {
+            const option = document.createElement('option');
+            option.value = contractor.inn || '';
+            option.textContent = `${contractor.name || 'Без названия'}${contractor.inn ? ' (' + contractor.inn + ')' : ''}`;
+            select.appendChild(option);
+          });
+        }
+      } catch (error) {
+        console.error('Ошибка загрузки контрагентов:', error);
+      }
+    }
+
+    async function loadDocumentTypes() {
+      try {
+        const res = await eel.get_processing_history(1, 1, '{}')();
+        if (res.status === 'success') {
+          // Получаем уникальные типы из статистики
+          const statsRes = await eel.get_history_statistics()();
+          if (statsRes.status === 'success' && statsRes.data.by_type) {
+            const select = document.getElementById('history-filter-type');
+            select.innerHTML = '<option value="">Все типы</option>';
+            Object.keys(statsRes.data.by_type).forEach(docType => {
+              const option = document.createElement('option');
+              option.value = docType;
+              option.textContent = translateDocType(docType);
+              select.appendChild(option);
+            });
+          }
+        }
+      } catch (error) {
+        console.error('Ошибка загрузки типов документов:', error);
+      }
+    }
+
+    function handleHistorySearch() {
+      // Debounce поиска
+      clearTimeout(window.historySearchTimeout);
+      window.historySearchTimeout = setTimeout(() => {
+        historyPage = 1;
+        loadHistory();
+      }, 500);
+    }
+
+    function formatAmount(amount) {
+      if (!amount) return '-';
+      return new Intl.NumberFormat('ru-RU', {
+        style: 'currency',
+        currency: 'RUB',
+        minimumFractionDigits: 2
+      }).format(amount);
+    }
+
+    function escapeHtml(text) {
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    }
+
+    // Обновляем showTab для загрузки истории
+    const originalShowTab = showTab;
+    showTab = function(tab) {
+      originalShowTab(tab);
+      if (tab === 'history') {
+        loadHistoryStats();
+        loadHistory();
+        loadContractorsList();
+        loadDocumentTypes();
+      }
+    };
+
     setInterval(updateCounts, 2000);
-    showTab('upload');
+    showTab('history');
   </script>
 </body>
 </html>

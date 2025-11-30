@@ -54,27 +54,9 @@ class DocumentClassifier:
         logger.info(f"Classifier initialized in mode: {self.mode}")
 
     def _normalize_text(self, text: str) -> str:
-        """Нормализация текста для русского языка: приведение к нижнему регистру, 
-        замена 'ё' на 'е', нормализация пробелов, удаление лишних символов."""
-        if not text:
-            return ""
-        
-        # Приведение к нижнему регистру
-        text = text.lower()
-        
-        # Замена 'ё' на 'е'
-        text = text.replace('ё', 'е')
-        
-        # Нормализация пробелов (заменяем последовательности пробельных символов на один пробел)
-        text = re.sub(r'\s+', ' ', text)
-        
-        # Удаление лишних символов, оставляем только буквы, цифры, пробелы и базовые знаки препинания
-        text = re.sub(r'[^\w\s\.\,\-\+\(\)\[\]\{\}\/\\=:;]', ' ', text)
-        
-        # Удаление лишних пробелов в начале и конце
-        text = text.strip()
-        
-        return text
+        """Нормализация текста для русского языка. Использует централизованный нормализатор."""
+        from core_parser.utils.text_normalizer import TextNormalizer
+        return TextNormalizer.normalize_for_classification(text)
 
     def _init_ml_pipeline(self) -> Pipeline:
         return Pipeline([
@@ -84,6 +66,52 @@ class DocumentClassifier:
 
     def classify_document(self, text: str, structure: Dict[str, Any]) -> ClassificationResult:
         logger.debug(f"Классификация документа: длина текста {len(text)} символов")
+        
+        # Если текст слишком короткий, пробуем классифицировать по имени файла
+        if len(text.strip()) < 10:
+            filename = structure.get('filename', '') or structure.get('file_path', '')
+            if filename:
+                filename_lower = filename.lower()
+                # Проверяем ключевые слова в имени файла
+                filename_scores = {}
+                for doc_type, sig in self.config.items():
+                    score = 0
+                    keywords = sig.get('keywords', [])
+                    patterns = sig.get('patterns', [])
+                    exclude = sig.get('exclude', [])
+                    
+                    # Проверяем ключевые слова
+                    for kw in keywords:
+                        if kw.lower() in filename_lower:
+                            score += 2
+                    
+                    # Проверяем паттерны
+                    for pat in patterns:
+                        if re.search(pat, filename_lower, re.IGNORECASE):
+                            score += 3
+                    
+                    # Проверяем исключения
+                    for ex in exclude:
+                        if ex.lower() in filename_lower:
+                            score -= 2
+                    
+                    if score > 0:
+                        filename_scores[doc_type] = score
+                
+                if filename_scores:
+                    best_type = max(filename_scores, key=filename_scores.get)
+                    best_score = filename_scores[best_type]
+                    confidence = min(0.9, 0.5 + (best_score / 10))
+                    logger.debug(f"Документ классифицирован по имени файла: {best_type} (score: {best_score}, confidence: {confidence})")
+                    return ClassificationResult(
+                        doc_type=best_type,
+                        confidence=confidence,
+                        rule_score=confidence,
+                        ml_score=0.0,
+                        bert_score=0.0,
+                        explanation="filename_based"
+                    )
+        
         if self.mode == "rules_only":
             rule_result = self._rule_based_classification(text)
             return ClassificationResult(
@@ -116,12 +144,9 @@ class DocumentClassifier:
             return ClassificationResult(final_doc_type, final_confidence, rule_result.confidence, ml_result.confidence, bert_result.confidence, "ensemble_mode")
 
     def _rule_based_classification(self, text: str) -> ClassificationResult:
-        
-        # Нормализация текста
-        text = text.lower()
-        text = text.replace('ё', 'е')
-        text = re.sub(r'\s+', ' ', text)
-        text = re.sub(r'[^\w\s\.\,\-\+]', '', text)  # убираем странные символы
+        # Нормализация текста с помощью централизованного нормализатора
+        from core_parser.utils.text_normalizer import TextNormalizer
+        normalized_text = TextNormalizer.normalize_for_classification(text)
         scores = {}
         for doc_type, sig in self.config.items():
             score = 0
@@ -129,17 +154,62 @@ class DocumentClassifier:
             patterns = sig.get('patterns', [])
             exclude = sig.get('exclude', [])
             for kw in keywords:
-                if kw.lower() in text:
+                if kw.lower() in normalized_text:
                     score += 1
             for pat in patterns:
-                if re.search(pat, text, re.IGNORECASE):
+                if re.search(pat, normalized_text, re.IGNORECASE):
                     score += 2
             for ex in exclude:
-                if ex.lower() in text:
+                if ex.lower() in normalized_text:
                     score -= 1
+            
+            # Повышаем приоритет для reconciliation_act, если найдены специфичные ключевые слова
+            if doc_type == 'reconciliation_act':
+                # Проверяем варианты с ошибками OCR
+                reconciliation_keywords = [
+                    'акт сверки', 'акт сврки', 'акт сверк', 'сверка взаиморасчетов', 
+                    'сверка взаиморасчётов', 'заимных расчетов', 'взаимных расчетов',
+                    'акт сверки взаиморасчетов', 'акт сверки взаиморасчётов'
+                ]
+                if any(kw in normalized_text for kw in reconciliation_keywords):
+                    score += 5  # Большой бонус за специфичные термины
+                
+                # Финансовые термины акта сверки
+                financial_keywords = ['сальдо', 'дебет', 'кредит', 'обороты', 'начальное сальдо', 
+                                     'конечное сальдо', 'входящее сальдо', 'исходящее сальдо']
+                if any(kw in normalized_text for kw in financial_keywords):
+                    score += 3  # Бонус за финансовые термины
+                
+                # Платежные поручения в актах сверки
+                if 'платежное поручение' in normalized_text or 'латежное поручение' in normalized_text:
+                    score += 2
+                
+                # Нижеподписавшиеся
+                if 'нижеподписавшиеся' in normalized_text or 'нижеподлисавшися' in normalized_text:
+                    score += 1
+            
             scores[doc_type] = max(0, score)
-        best_type = max(scores, key=scores.get)
-        score = scores[best_type]
+        
+        # Если есть несколько типов с одинаковым счетом, приоритет reconciliation_act
+        max_score = max(scores.values()) if scores else 0
+        best_types = [dt for dt, sc in scores.items() if sc == max_score]
+        
+        # Специальная логика для актов сверки - повышаем приоритет если есть ключевые слова
+        reconciliation_score = scores.get('reconciliation_act', 0)
+        if reconciliation_score > 0:
+            # Если есть хотя бы слабые признаки акта сверки, повышаем приоритет
+            if any(kw in normalized_text for kw in ['акт', 'сверк', 'заимных', 'взаимных', 'сальдо', 'дебет', 'кредит']):
+                reconciliation_score += 2
+        
+        # Если reconciliation_act имеет высокий счет или есть в лучших типах, выбираем его
+        if len(best_types) > 1 and 'reconciliation_act' in best_types:
+            best_type = 'reconciliation_act'
+        elif reconciliation_score >= max_score and reconciliation_score > 3:
+            # Если счет акта сверки достаточно высокий, выбираем его
+            best_type = 'reconciliation_act'
+        else:
+            best_type = max(scores, key=scores.get) if scores else 'unknown'
+        score = scores[best_type] if best_type in scores else 0
         # Исправленный расчет confidence
         if score >= 3:
             confidence = 1.0
@@ -257,7 +327,12 @@ class BatchClassifier:
         statistics = {'classified': 0, 'uncertain': 0, 'types': {}}
         for filename, data in documents.items():
             logger.debug(f"Классификация документа: {filename}")
-            result = self.classifier.classify_document(data['full_text'], data)
+            # Убеждаемся, что filename есть в структуре для классификации по имени файла
+            if 'filename' not in data:
+                data['filename'] = filename
+            if 'file_path' not in data:
+                data['file_path'] = filename
+            result = self.classifier.classify_document(data.get('full_text', ''), data)
             results[filename] = result
             if result.confidence > 0.5:
                 statistics['classified'] += 1
